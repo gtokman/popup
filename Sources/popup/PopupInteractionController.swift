@@ -142,7 +142,7 @@ final class PopupInteractionController: NSObject, UIViewControllerInteractiveTra
             spring: spring,
             from: currentProgress,
             to: complete ? 1 : 0,
-            velocity: velocity,
+            velocity: min(max(velocity, -4), 4),
             complete: complete,
             context: context,
             scene: scene
@@ -165,7 +165,7 @@ final class PopupInteractionController: NSObject, UIViewControllerInteractiveTra
         hasSignaledFinish = true
 
         if complete {
-            let progressVelocity = scene.closeProgressVelocity(forDragVelocity: velocity)
+            let progressVelocity = min(max(scene.closeProgressVelocity(forDragVelocity: velocity), -4), 4)
             let origin = Self.clamp(scene.dragOffset / scene.containerHeight, 0, 1)
             contextProgressOrigin = origin
             contextProgressRange = 1 - origin
@@ -275,6 +275,16 @@ final class PopupInteractionController: NSObject, UIViewControllerInteractiveTra
 enum PopupGestureMath {
     static let projectionTime: CGFloat = 0.2
     static let flickThreshold: CGFloat = 1.0
+
+    static func softenedOvershoot(_ progress: CGFloat, limit: CGFloat = 0.03) -> CGFloat {
+        if progress > 1 {
+            return 1 + limit * CGFloat(tanh(Double((progress - 1) / limit)))
+        }
+        if progress < 0 {
+            return -limit * CGFloat(tanh(Double(-progress / limit)))
+        }
+        return progress
+    }
 
     static func shouldComplete(fraction: CGFloat, velocity: CGFloat) -> Bool {
         if abs(velocity) > flickThreshold {

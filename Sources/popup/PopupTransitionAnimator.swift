@@ -72,7 +72,6 @@ final class PopupTransitionScene {
     private var artworkView: UIView?
     private var morphView: UIView?
     private var backdrop: UIVisualEffectView?
-    private var contentSnapshot: UIView?
     private var barSnapshot: UIImageView?
     private var flyer: UIImageView?
 
@@ -168,9 +167,6 @@ final class PopupTransitionScene {
             : nil
         if flyer != nil { artworkView?.alpha = 0 }
 
-        let contentSnapshot = contentView.snapshotView(afterScreenUpdates: true) ?? UIView()
-        contentView.alpha = 0
-
         bar.imageView.isHidden = flyer != nil
         let barRender = UIGraphicsImageRenderer(bounds: bar.contentView.bounds).image { renderer in
             bar.contentView.layer.render(in: renderer.cgContext)
@@ -178,17 +174,19 @@ final class PopupTransitionScene {
         bar.imageView.isHidden = false
         bar.alpha = 0
 
-        let morphView = UIView()
+        let morphView = UIView(frame: openFrame)
         morphView.clipsToBounds = true
         morphView.layer.cornerCurve = .continuous
         let backdrop = UIVisualEffectView(effect: bar.backgroundView.effect)
         backdrop.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         let barSnapshot = UIImageView(image: barRender)
         barSnapshot.bounds = CGRect(origin: .zero, size: barFrame.size)
-        contentSnapshot.autoresizingMask = []
-        contentSnapshot.bounds = CGRect(origin: .zero, size: openFrame.size)
+        contentView.autoresizingMask = []
+        contentView.frame = CGRect(origin: .zero, size: openFrame.size)
+        contentView.alpha = 0
         morphView.addSubview(backdrop)
-        morphView.addSubview(contentSnapshot)
+        morphView.addSubview(contentView)
+        contentView.layoutIfNeeded()
         morphView.addSubview(barSnapshot)
         container.addSubview(morphView)
 
@@ -214,7 +212,6 @@ final class PopupTransitionScene {
         self.artworkView = artworkView
         self.morphView = morphView
         self.backdrop = backdrop
-        self.contentSnapshot = contentSnapshot
         self.barSnapshot = barSnapshot
         self.flyer = flyer
         self.openFrame = openFrame
@@ -236,11 +233,12 @@ final class PopupTransitionScene {
         guard !isNoOp, !hasCompleted,
               let morphView,
               let backdrop,
-              let contentSnapshot,
+              let contentView,
               let barSnapshot,
               let presenterView else { return }
 
         UIView.performWithoutAnimation {
+            let geometryProgress = PopupGestureMath.softenedOvershoot(progress)
             let frame: CGRect
             let scale: CGFloat
             let dimming: CGFloat
@@ -259,42 +257,42 @@ final class PopupTransitionScene {
                 flyerRadius = artworkRadius
                 presenterCornerRadius = openRadius
             } else if isPresenting {
-                frame = Self.interpolate(barFrame, openFrame, progress)
-                scale = Self.interpolate(1, backgroundScale, progress)
+                frame = Self.interpolate(barFrame, openFrame, geometryProgress)
+                scale = Self.interpolate(1, backgroundScale, geometryProgress)
                 dimming = Self.interpolate(0, dimmingAlpha, progress)
-                cornerRadius = max(0, Self.interpolate(barRadius, openRadius, progress))
-                flyerFrame = artworkFrame.map { Self.interpolate(barArtworkFrame, $0, progress) }
-                flyerRadius = max(0, Self.interpolate(barArtworkRadius, artworkRadius, progress))
-                presenterCornerRadius = max(0, Self.interpolate(0, openRadius, progress))
+                cornerRadius = max(0, Self.interpolate(barRadius, openRadius, geometryProgress))
+                flyerFrame = artworkFrame.map { Self.interpolate(barArtworkFrame, $0, geometryProgress) }
+                flyerRadius = max(0, Self.interpolate(barArtworkRadius, artworkRadius, geometryProgress))
+                presenterCornerRadius = max(0, Self.interpolate(0, openRadius, geometryProgress))
             } else {
                 let startFrame = closeStartFrame ?? openFrame
                 let startArtworkFrame = closeStartArtworkFrame ?? artworkFrame
-                frame = Self.interpolate(startFrame, barFrame, progress)
-                scale = Self.interpolate(closeStartScale ?? backgroundScale, 1, progress)
+                frame = Self.interpolate(startFrame, barFrame, geometryProgress)
+                scale = Self.interpolate(closeStartScale ?? backgroundScale, 1, geometryProgress)
                 dimming = Self.interpolate(closeStartDimming ?? dimmingAlpha, 0, progress)
-                cornerRadius = max(0, Self.interpolate(openRadius, barRadius, progress))
-                flyerFrame = startArtworkFrame.map { Self.interpolate($0, barArtworkFrame, progress) }
-                flyerRadius = max(0, Self.interpolate(artworkRadius, barArtworkRadius, progress))
-                presenterCornerRadius = max(0, Self.interpolate(openRadius, 0, progress))
+                cornerRadius = max(0, Self.interpolate(openRadius, barRadius, geometryProgress))
+                flyerFrame = startArtworkFrame.map { Self.interpolate($0, barArtworkFrame, geometryProgress) }
+                flyerRadius = max(0, Self.interpolate(artworkRadius, barArtworkRadius, geometryProgress))
+                presenterCornerRadius = max(0, Self.interpolate(openRadius, 0, geometryProgress))
             }
 
             morphView.frame = frame
             backdrop.frame = morphView.bounds
             morphView.layer.cornerRadius = max(0, cornerRadius)
 
-            let snapshotScale = openFrame.width == 0 ? 1 : frame.width / openFrame.width
-            contentSnapshot.transform = CGAffineTransform(scaleX: snapshotScale, y: snapshotScale)
-            contentSnapshot.center = CGPoint(
+            let contentScale = openFrame.width == 0 ? 1 : frame.width / openFrame.width
+            contentView.transform = CGAffineTransform(scaleX: contentScale, y: contentScale)
+            contentView.center = CGPoint(
                 x: frame.width / 2,
-                y: openFrame.height * snapshotScale / 2
+                y: openFrame.height * contentScale / 2
             )
             barSnapshot.center = CGPoint(x: frame.width / 2, y: barFrame.height / 2)
 
             if isPresenting {
                 barSnapshot.alpha = Self.clamp(1 - progress / 0.2, 0, 1)
-                contentSnapshot.alpha = Self.clamp(progress / 0.35, 0, 1)
+                contentView.alpha = Self.clamp(progress / 0.35, 0, 1)
             } else {
-                contentSnapshot.alpha = Self.clamp(1 - (progress - 0.45) / 0.4, 0, 1)
+                contentView.alpha = Self.clamp(1 - (progress - 0.45) / 0.4, 0, 1)
                 barSnapshot.alpha = Self.clamp((progress - 0.6) / 0.3, 0, 1)
             }
 
@@ -330,6 +328,7 @@ final class PopupTransitionScene {
         guard !isNoOp, !hasCompleted,
               let morphView,
               let contentView,
+              let containerView,
               let presenterView,
               let bar else { return }
 
@@ -350,7 +349,16 @@ final class PopupTransitionScene {
             artworkView?.alpha = artworkAlpha
             contentView.alpha = 1
             if isOpen {
+                if contentView.superview !== containerView {
+                    if let dimmingView, dimmingView.superview === containerView {
+                        containerView.insertSubview(contentView, aboveSubview: dimmingView)
+                    } else {
+                        containerView.addSubview(contentView)
+                    }
+                }
+                contentView.transform = .identity
                 contentView.frame = openFrame
+                contentView.layoutIfNeeded()
             } else {
                 contentView.removeFromSuperview()
                 presenterView.layer.masksToBounds = false

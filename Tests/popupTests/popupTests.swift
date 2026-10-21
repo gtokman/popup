@@ -184,3 +184,17 @@ func upwardDragRubberBandIsMonotonicAndBounded() {
     #expect(zip(offsets, offsets.dropFirst()).allSatisfy { $0 > $1 })
     #expect(offsets.allSatisfy { $0 >= -height && $0 <= 0 })
 }
+
+@Test
+func softenedOvershootIsIdentityMonotonicAndBounded() {
+    let inRange = stride(from: CGFloat(0), through: 1, by: 0.1).map {
+        PopupGestureMath.softenedOvershoot($0)
+    }
+    #expect(inRange == stride(from: CGFloat(0), through: 1, by: 0.1).map { $0 })
+
+    let inputs: [CGFloat] = [-50, -10, -1, 0, 0.5, 1, 2, 10, 50]
+    let outputs = inputs.map { PopupGestureMath.softenedOvershoot($0) }
+    #expect(zip(outputs, outputs.dropFirst()).allSatisfy { $0 <= $1 })
+    #expect(outputs.first! >= -0.03)
+    #expect(outputs.last! <= 1.03)
+}
