@@ -22,8 +22,8 @@ final class SpringDriver {
     private let damping: CGFloat
     private let onUpdate: (CGFloat) -> Void
     private let onComplete: () -> Void
-    private var displayLink: CADisplayLink?
-    private var lastTimestamp: CFTimeInterval?
+    private var updateLink: UIUpdateLink?
+    private var lastTime: TimeInterval?
 
     private(set) var value: CGFloat
     private(set) var velocity: CGFloat
@@ -34,6 +34,7 @@ final class SpringDriver {
         from: CGFloat,
         to: CGFloat,
         velocity: CGFloat,
+        view: UIView,
         onUpdate: @escaping (CGFloat) -> Void,
         onComplete: @escaping () -> Void
     ) {
@@ -48,12 +49,15 @@ final class SpringDriver {
         stiffness = angularFrequency * angularFrequency
         damping = 4 * CGFloat.pi * spring.dampingRatio / response
 
-        let proxy = SpringDisplayLinkProxy()
-        proxy.driver = self
-        let displayLink = CADisplayLink(target: proxy, selector: #selector(SpringDisplayLinkProxy.tick(_:)))
-        displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
-        self.displayLink = displayLink
-        displayLink.add(to: .main, forMode: .common)
+        let updateLink = UIUpdateLink(view: view)
+        updateLink.addAction(to: .beforeCATransactionCommit) { [weak self] _, info in
+            self?.tick(now: info.modelTime)
+        }
+        updateLink.requiresContinuousUpdates = true
+        updateLink.wantsLowLatencyEventDispatch = false
+        updateLink.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+        self.updateLink = updateLink
+        updateLink.isEnabled = true
     }
 
     @discardableResult
@@ -81,15 +85,15 @@ final class SpringDriver {
         return (value, velocity)
     }
 
-    fileprivate func displayLinkDidFire(_ displayLink: CADisplayLink) {
+    func tick(now: TimeInterval) {
         let dt: TimeInterval
-        if let lastTimestamp {
-            dt = displayLink.targetTimestamp - lastTimestamp
+        if let lastTime {
+            dt = now - lastTime
         } else {
-            dt = displayLink.duration
+            dt = 1.0 / 120.0
         }
-        lastTimestamp = displayLink.targetTimestamp
-        step(dt)
+        self.lastTime = now
+        step(min(dt, 1.0 / 30.0))
     }
 
     private func complete() {
@@ -103,20 +107,7 @@ final class SpringDriver {
     private func invalidate() {
         guard isRunning else { return }
         isRunning = false
-        displayLink?.invalidate()
-        displayLink = nil
-    }
-}
-
-@MainActor
-private final class SpringDisplayLinkProxy: NSObject {
-    weak var driver: SpringDriver?
-
-    @objc func tick(_ displayLink: CADisplayLink) {
-        guard let driver else {
-            displayLink.invalidate()
-            return
-        }
-        driver.displayLinkDidFire(displayLink)
+        updateLink?.isEnabled = false
+        updateLink = nil
     }
 }

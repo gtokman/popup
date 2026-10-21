@@ -190,6 +190,7 @@ final class PopupInteractionController: NSObject, UIViewControllerInteractiveTra
                 from: scene.dragOffset,
                 to: 0,
                 velocity: velocity,
+                view: context.containerView,
                 onUpdate: { [weak self, weak scene] offset in
                     guard let self, let scene else { return }
                     scene.dragOffset = offset
@@ -219,6 +220,7 @@ final class PopupInteractionController: NSObject, UIViewControllerInteractiveTra
             from: from,
             to: to,
             velocity: velocity,
+            view: context.containerView,
             onUpdate: { [weak self, weak scene] progress in
                 guard let self, let scene else { return }
                 self.currentProgress = progress

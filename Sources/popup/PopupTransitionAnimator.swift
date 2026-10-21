@@ -29,6 +29,7 @@ final class PopupTransitionAnimator: NSObject, UIViewControllerAnimatedTransitio
             from: 0,
             to: 1,
             velocity: 0,
+            view: transitionContext.containerView,
             onUpdate: { scene.apply(progress: $0) },
             onComplete: { [weak self] in
                 scene.complete(reachedTarget: true)

@@ -68,6 +68,7 @@ func closeSpringOvershootsAndSettlesAtTarget() {
         from: 0,
         to: 1,
         velocity: 0,
+        view: UIView(),
         onUpdate: { maximumValue = max(maximumValue, $0) },
         onComplete: { didComplete = true }
     )
@@ -90,6 +91,7 @@ func settleSpringDoesNotOvershoot() {
         from: 0,
         to: 1,
         velocity: 0,
+        view: UIView(),
         onUpdate: { maximumValue = max(maximumValue, $0) },
         onComplete: {}
     )
@@ -111,6 +113,7 @@ func initialVelocityTowardTargetReachesMidpointSooner() {
             from: 0,
             to: 1,
             velocity: initialVelocity,
+            view: UIView(),
             onUpdate: { _ in },
             onComplete: {}
         )
@@ -136,6 +139,7 @@ func stoppingSpringReturnsStateWithoutCompleting() {
         from: 0,
         to: 1,
         velocity: 0,
+        view: UIView(),
         onUpdate: { _ in },
         onComplete: { didComplete = true }
     )
@@ -146,6 +150,27 @@ func stoppingSpringReturnsStateWithoutCompleting() {
     #expect(stopped.value == driver.value)
     #expect(stopped.velocity == driver.velocity)
     #expect(didComplete == false)
+}
+
+@Test @MainActor
+func largeSpringTickDeltaIsClamped() {
+    let driver = SpringDriver(
+        spring: .close,
+        from: 0,
+        to: 1,
+        velocity: 0,
+        view: UIView(),
+        onUpdate: { _ in },
+        onComplete: {}
+    )
+    driver.tick(now: 10)
+    driver.tick(now: 10_000)
+
+    #expect(driver.value.isFinite)
+    #expect(driver.velocity.isFinite)
+    #expect(driver.value <= 2)
+
+    driver.stop()
 }
 
 @Test @MainActor
