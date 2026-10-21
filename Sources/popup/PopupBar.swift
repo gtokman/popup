@@ -11,6 +11,7 @@ public final class PopupBar: UIView {
             guard preferredHeight != oldValue else { return }
             imageSizeConstraints.forEach { $0.constant = itemSide }
             buttonSizeConstraints.forEach { $0.constant = itemSide }
+            updateTextOnlyContentInsets()
             invalidateIntrinsicContentSize()
             setNeedsLayout()
             preferredHeightDidChange?(preferredHeight)
@@ -21,6 +22,7 @@ public final class PopupBar: UIView {
     public var widthMode: WidthMode = .fill {
         didSet {
             guard widthMode != oldValue else { return }
+            updateTextOnlyContentInsets()
             invalidateIntrinsicContentSize()
             widthModeDidChange?(widthMode)
         }
@@ -47,6 +49,7 @@ public final class PopupBar: UIView {
     public static let contentInset: CGFloat = 8
 
     private var itemSide: CGFloat { max(preferredHeight - Self.contentInset * 2, 0) }
+    private var textOnlyFitHorizontalPadding: CGFloat { max(preferredHeight / 2 - 4, 0) }
     var isInlineAccessory = false {
         didSet { updateInlineAccessoryVisibility() }
     }
@@ -62,11 +65,14 @@ public final class PopupBar: UIView {
         let hasImage = popupItem?.image != nil
         let buttonCount = popupItem?.barButtonItems.count ?? 0
         let visibleButtonCount = isInlineAccessory ? min(buttonCount, 1) : buttonCount
+        let textWidth = max(titleLabel.textContentWidth, isInlineAccessory ? 0 : subtitleLabel.textContentWidth)
+        if widthMode == .fitsContent, !hasImage, visibleButtonCount == 0 {
+            return ceil(textWidth + textOnlyFitHorizontalPadding * 2)
+        }
         let leadingInset = hasImage ? Self.contentInset + itemSide + 10 : 20
         let trailingInset = visibleButtonCount > 0
             ? Self.contentInset * 2 + 8 + CGFloat(visibleButtonCount) * itemSide
             : 20
-        let textWidth = max(titleLabel.textContentWidth, isInlineAccessory ? 0 : subtitleLabel.textContentWidth)
         return ceil(leadingInset + textWidth + trailingInset)
     }
 
@@ -286,6 +292,7 @@ public final class PopupBar: UIView {
         labelsTrailingWithButtonsConstraint?.isActive = hasButtons
         labelsTrailingWithoutButtonsConstraint?.isActive = !hasButtons
         buttonsStack.isHidden = !hasButtons
+        updateTextOnlyContentInsets()
         updateInlineAccessoryVisibility()
         invalidateIntrinsicContentSize()
         preferredContentWidthDidChange?(preferredContentWidth)
@@ -306,11 +313,23 @@ public final class PopupBar: UIView {
     }
 
     private func updateInlineAccessoryVisibility() {
+        updateTextOnlyContentInsets()
         subtitleLabel.isHidden = isInlineAccessory || popupItem?.subtitle == nil
         for (index, button) in buttonsStack.arrangedSubviews.enumerated() {
             button.isHidden = isInlineAccessory && index > 0
         }
         invalidateIntrinsicContentSize()
         preferredContentWidthDidChange?(preferredContentWidth)
+    }
+
+    private func updateTextOnlyContentInsets() {
+        let buttonCount = popupItem?.barButtonItems.count ?? 0
+        let visibleButtonCount = isInlineAccessory ? min(buttonCount, 1) : buttonCount
+        let usesCompactInsets = widthMode == .fitsContent
+            && popupItem?.image == nil
+            && visibleButtonCount == 0
+        let inset = usesCompactInsets ? textOnlyFitHorizontalPadding : 20
+        labelsLeadingWithoutImageConstraint?.constant = inset
+        labelsTrailingWithoutButtonsConstraint?.constant = -inset
     }
 }

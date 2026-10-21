@@ -104,6 +104,28 @@ func popupBarInlineAccessoryFitsVisibleControls() {
 }
 
 @Test @MainActor
+func popupBarFitsTextOnlyContentWithCapsulePadding() {
+    let bar = PopupBar()
+    bar.preferredHeight = 35
+    bar.widthMode = .fitsContent
+    let item = PopupItem()
+    item.attributedTitle = NSAttributedString(
+        string: "2 files changed +6 −9",
+        attributes: [.font: UIFont.systemFont(ofSize: 15, weight: .semibold)]
+    )
+    bar.popupItem = item
+
+    let label = UILabel()
+    label.attributedText = item.attributedTitle
+    let textWidth = label.sizeThatFits(
+        CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+    ).width
+    let horizontalPadding = bar.preferredHeight / 2 - 4
+
+    #expect(bar.preferredContentWidth == ceil(textWidth + horizontalPadding * 2))
+}
+
+@Test @MainActor
 func popupBarCanDockAboveNavigationToolbar() {
     let navigationController = UINavigationController(rootViewController: UIViewController())
     navigationController.setToolbarHidden(false, animated: false)

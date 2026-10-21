@@ -131,18 +131,19 @@ final class ChangedFilesViewController: UIViewController {
     }
 
     private static var popupTitle: NSAttributedString {
-        let font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        let titleFont = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        let countFont = UIFont.systemFont(ofSize: 14, weight: .medium)
         let title = NSMutableAttributedString(
             string: "2 files changed",
-            attributes: [.font: font, .foregroundColor: UIColor.label]
+            attributes: [.font: titleFont, .foregroundColor: UIColor.label]
         )
         title.append(NSAttributedString(
             string: " +6",
-            attributes: [.font: font, .foregroundColor: UIColor.systemGreen]
+            attributes: [.font: countFont, .foregroundColor: UIColor.systemGreen]
         ))
         title.append(NSAttributedString(
             string: " −9",
-            attributes: [.font: font, .foregroundColor: UIColor.systemRed]
+            attributes: [.font: countFont, .foregroundColor: UIColor.systemRed]
         ))
         return title
     }
