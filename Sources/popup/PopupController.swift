@@ -30,6 +30,26 @@ public final class PopupController: NSObject {
     public var dimmingAlpha: CGFloat = 0.25
     /// Corner radius of the content when fully open. Defaults to the display's corner radius.
     public var openCornerRadius: CGFloat?
+    public weak var dockingAnchorView: UIView? {
+        didSet {
+            if dockingAnchorView !== oldValue, state != .hidden {
+                reinstallBar()
+            }
+        }
+    }
+    public var barSpacing: CGFloat = 6 {
+        didSet {
+            barBottomConstraint?.constant -= barSpacing - oldValue
+            if state != .hidden { updateContentInsets(visible: true) }
+        }
+    }
+    public var usesTabBarAccessory = false {
+        didSet {
+            if usesTabBarAccessory != oldValue, state != .hidden {
+                reinstallBar()
+            }
+        }
+    }
 
     weak var containerViewController: UIViewController?
     var interaction: PopupInteractionController?
@@ -38,6 +58,16 @@ public final class PopupController: NSObject {
     private var gestureStartDragOffset: CGFloat = 0
     private var trackedScrollViews = NSHashTable<UIScrollView>.weakObjects()
     private var barBottomConstraint: NSLayoutConstraint?
+    private var barLeadingConstraint: NSLayoutConstraint?
+    private var barTrailingConstraint: NSLayoutConstraint?
+    private var barCenterXConstraint: NSLayoutConstraint?
+    private var barWidthConstraint: NSLayoutConstraint?
+    private var barMaximumWidthConstraint: NSLayoutConstraint?
+    private var barAccessoryWidthConstraint: NSLayoutConstraint?
+    private var barAccessoryFitWidthConstraint: NSLayoutConstraint?
+    private var barHeightConstraint: NSLayoutConstraint?
+    private var accessoryTransitionContainer: UIView?
+    private var isUsingTabBarAccessory = false
     private var pendingCompletion: (() -> Void)?
 
     private(set) lazy var barPanGesture: UIPanGestureRecognizer = {
@@ -58,6 +88,30 @@ public final class PopupController: NSObject {
     init(containerViewController: UIViewController) {
         self.containerViewController = containerViewController
         super.init()
+        if #available(iOS 26.0, *), containerViewController is UITabBarController {
+            usesTabBarAccessory = true
+        }
+        bar.preferredHeightDidChange = { [weak self] height in
+            self?.barHeightConstraint?.constant = height
+            if self?.state != .hidden { self?.updateContentInsets(visible: true) }
+        }
+        bar.horizontalMarginDidChange = { [weak self] margin in
+            self?.barLeadingConstraint?.constant = margin
+            self?.barTrailingConstraint?.constant = -margin
+            self?.barMaximumWidthConstraint?.constant = -2 * margin
+            self?.barAccessoryWidthConstraint?.constant = -2 * margin
+        }
+        bar.widthModeDidChange = { [weak self] _ in self?.updateBarWidthConstraints() }
+        bar.preferredContentWidthDidChange = { [weak self] width in
+            self?.barWidthConstraint?.constant = width
+            self?.barAccessoryFitWidthConstraint?.constant = width
+        }
+        if #available(iOS 26.0, *), containerViewController is UITabBarController {
+            bar.registerForTraitChanges([UITraitTabAccessoryEnvironment.self]) { [weak self] (bar: PopupBar, _) in
+                bar.isInlineAccessory = bar.traitCollection.tabAccessoryEnvironment == .inline
+                self?.updateBarWidthConstraints()
+            }
+        }
         bar.addGestureRecognizer(barTapGesture)
         bar.addGestureRecognizer(barPanGesture)
     }
@@ -112,6 +166,7 @@ public final class PopupController: NSObject {
             return
         }
         let finish = {
+            self.removeInstalledBar()
             self.bar.removeFromSuperview()
             self.bar.transform = .identity
             self.contentViewController?.popupContainer = nil
@@ -138,32 +193,151 @@ public final class PopupController: NSObject {
     private func installBar(in container: UIViewController) {
         bar.translatesAutoresizingMaskIntoConstraints = false
         let view = container.view!
+        view.layoutIfNeeded()
+        if #available(iOS 26.0, *),
+           let tabBarController = container as? UITabBarController,
+           usesTabBarAccessory {
+            isUsingTabBarAccessory = true
+            bar.setSystemAccessoryStyle(true)
+            tabBarController.setBottomAccessory(UITabAccessory(contentView: bar), animated: true)
+            barAccessoryWidthConstraint = bar.widthAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.widthAnchor,
+                constant: -2 * bar.horizontalMargin
+            )
+            barAccessoryWidthConstraint?.priority = .defaultHigh
+            barAccessoryFitWidthConstraint = bar.widthAnchor.constraint(equalToConstant: bar.preferredContentWidth)
+            barAccessoryFitWidthConstraint?.priority = .required
+            bar.isInlineAccessory = tabBarController.traitCollection.tabAccessoryEnvironment == .inline
+            updateBarWidthConstraints()
+            return
+        }
+        isUsingTabBarAccessory = false
+        bar.setSystemAccessoryStyle(false)
         let bottom: NSLayoutConstraint
-        if let tabBarController = container as? UITabBarController, !tabBarController.tabBar.isHidden {
-            view.insertSubview(bar, belowSubview: tabBarController.tabBar)
-            bottom = bar.bottomAnchor.constraint(equalTo: tabBarController.tabBar.topAnchor, constant: -Self.barGap)
+        if let anchor = dockingAnchorView, let parent = anchor.superview {
+            parent.insertSubview(bar, belowSubview: anchor)
+            bottom = bar.bottomAnchor.constraint(equalTo: anchor.topAnchor, constant: -barSpacing)
         } else if let navigationController = container as? UINavigationController, !navigationController.isToolbarHidden {
-            view.insertSubview(bar, belowSubview: navigationController.toolbar)
-            bottom = bar.bottomAnchor.constraint(equalTo: navigationController.toolbar.topAnchor, constant: -Self.barGap)
+            let toolbar = navigationController.toolbar
+            view.addSubview(bar)
+            let toolbarClearance: CGFloat
+            if let toolbar, toolbar.window === view.window {
+                let toolbarFrame = toolbar.convert(toolbar.bounds, to: view)
+                toolbarClearance = max(view.safeAreaLayoutGuide.layoutFrame.maxY - toolbarFrame.minY, 0)
+            } else {
+                toolbarClearance = 44
+            }
+            bottom = bar.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -toolbarClearance - barSpacing
+            )
         } else {
             view.addSubview(bar)
-            bottom = bar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Self.barGap)
+            bottom = bar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -barSpacing)
         }
         barBottomConstraint = bottom
+        barLeadingConstraint = bar.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: bar.horizontalMargin)
+        barTrailingConstraint = bar.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -bar.horizontalMargin)
+        barCenterXConstraint = bar.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor)
+        barWidthConstraint = bar.widthAnchor.constraint(equalToConstant: bar.preferredContentWidth)
+        barWidthConstraint?.priority = .defaultHigh
+        barMaximumWidthConstraint = bar.widthAnchor.constraint(
+            lessThanOrEqualTo: view.safeAreaLayoutGuide.widthAnchor,
+            constant: -2 * bar.horizontalMargin
+        )
+        barHeightConstraint = bar.heightAnchor.constraint(equalToConstant: bar.preferredHeight)
         NSLayoutConstraint.activate([
-            bar.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: bar.horizontalMargin),
-            bar.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -bar.horizontalMargin),
-            bar.heightAnchor.constraint(equalToConstant: PopupBar.height),
+            barHeightConstraint!,
             bottom,
         ])
+        updateBarWidthConstraints()
     }
 
-    private static let barGap: CGFloat = 6
-    private var barInset: CGFloat { PopupBar.height + Self.barGap * 2 }
+    private var barInset: CGFloat {
+        bar.preferredHeight + barSpacing * (dockingAnchorView == nil ? 2 : 1)
+    }
+
+    private func reinstallBar() {
+        guard state != .hidden, let container = containerViewController else { return }
+        removeInstalledBar()
+        bar.removeFromSuperview()
+        installBar(in: container)
+        container.view.layoutIfNeeded()
+    }
+
+    private func updateBarWidthConstraints() {
+        if isUsingTabBarAccessory {
+            let usesFitWidth = bar.widthMode == .fitsContent || bar.isInlineAccessory
+            barAccessoryWidthConstraint?.isActive = !usesFitWidth
+            barAccessoryFitWidthConstraint?.constant = bar.preferredContentWidth
+            barAccessoryFitWidthConstraint?.isActive = usesFitWidth
+            return
+        }
+        guard barWidthConstraint != nil else { return }
+        let fitsContent = bar.widthMode == .fitsContent
+        barLeadingConstraint?.isActive = !fitsContent
+        barTrailingConstraint?.isActive = !fitsContent
+        barCenterXConstraint?.isActive = fitsContent
+        barWidthConstraint?.constant = bar.preferredContentWidth
+        barWidthConstraint?.isActive = fitsContent
+        barMaximumWidthConstraint?.constant = -2 * bar.horizontalMargin
+        barMaximumWidthConstraint?.isActive = fitsContent
+    }
+
+    private func removeInstalledBar() {
+        if #available(iOS 26.0, *),
+           isUsingTabBarAccessory,
+           let tabBarController = containerViewController as? UITabBarController {
+            tabBarController.setBottomAccessory(nil, animated: false)
+        }
+        isUsingTabBarAccessory = false
+        accessoryTransitionContainer?.isHidden = false
+        accessoryTransitionContainer = nil
+        bar.setSystemAccessoryStyle(false)
+        bar.isInlineAccessory = false
+        [barBottomConstraint, barLeadingConstraint, barTrailingConstraint, barCenterXConstraint,
+         barWidthConstraint, barMaximumWidthConstraint, barHeightConstraint]
+            .forEach { $0?.isActive = false }
+        barBottomConstraint = nil
+        barLeadingConstraint = nil
+        barTrailingConstraint = nil
+        barCenterXConstraint = nil
+        barWidthConstraint = nil
+        barMaximumWidthConstraint = nil
+        barAccessoryWidthConstraint?.isActive = false
+        barAccessoryWidthConstraint = nil
+        barAccessoryFitWidthConstraint?.isActive = false
+        barAccessoryFitWidthConstraint = nil
+        barHeightConstraint = nil
+    }
+
+    func setBarHiddenForTransition(_ hidden: Bool) {
+        guard isUsingTabBarAccessory, let root = containerViewController?.view else {
+            bar.alpha = hidden ? 0 : 1
+            return
+        }
+        if hidden {
+            var ancestor: UIView = bar
+            while let parent = ancestor.superview, parent !== root {
+                ancestor = parent
+            }
+            if ancestor.superview === root {
+                accessoryTransitionContainer = ancestor
+                ancestor.isHidden = true
+            } else {
+                bar.alpha = 0
+            }
+        } else {
+            accessoryTransitionContainer?.isHidden = false
+            accessoryTransitionContainer = nil
+            bar.alpha = 1
+        }
+    }
 
     /// Keeps scrollable content clear of the bar by insetting the container's children.
     private func updateContentInsets(visible: Bool) {
         guard let container = containerViewController else { return }
+        if isUsingTabBarAccessory { return }
         let inset = visible ? barInset : 0
         let docksOnBottomBar = container is UITabBarController || (container as? UINavigationController)?.isToolbarHidden == false
         if docksOnBottomBar || !container.children.isEmpty {
@@ -173,7 +347,7 @@ public final class PopupController: NSObject {
         } else {
             container.additionalSafeAreaInsets.bottom = inset
             // The guide moved up by `inset`; keep the bar on the original safe-area bottom.
-            barBottomConstraint?.constant = inset - Self.barGap
+            barBottomConstraint?.constant = inset - barSpacing
         }
     }
 
@@ -218,7 +392,7 @@ public final class PopupController: NSObject {
     /// Called by the presentation controller once UIKit settles the transition.
     func transitionDidEnd(isOpen: Bool) {
         state = isOpen ? .open : .barPresented
-        bar.alpha = isOpen ? 0 : 1
+        setBarHiddenForTransition(isOpen)
         interaction = nil
         let completion = pendingCompletion
         pendingCompletion = nil

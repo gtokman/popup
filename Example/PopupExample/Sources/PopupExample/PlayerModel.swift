@@ -2,15 +2,20 @@ import UIKit
 
 @MainActor
 final class PlayerModel {
-    static let shared = PlayerModel()
-
     private(set) var currentSong: Song?
     private(set) var isPlaying = false
     private(set) var elapsedTime: TimeInterval = 0
     var nowPlayingViewController: NowPlayingViewController?
     private var timer: Timer?
 
-    private init() {}
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        currentSong = nil
+        isPlaying = false
+        elapsedTime = 0
+        updateNowPlaying()
+    }
 
     func play(_ song: Song) {
         currentSong = song

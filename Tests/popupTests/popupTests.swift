@@ -12,9 +12,9 @@ func observerReceivesEveryPropertyChange() {
     item.addObserver(owner) { _ in notifications += 1 }
 
     item.title = "Title"
+    item.attributedTitle = NSAttributedString(string: "Attributed title")
     item.subtitle = "Subtitle"
     item.image = UIImage(systemName: "music.note")
-    item.progress = 0.5
     item.barButtonItems = [UIBarButtonItem(image: UIImage(systemName: "play.fill"), style: .plain, target: nil, action: nil)]
 
     #expect(notifications == 5)
@@ -31,6 +31,86 @@ func removingObserverStopsNotifications() {
     item.title = "Title"
 
     #expect(notifications == 0)
+}
+
+@Test @MainActor
+func popupBarWithoutArtworkOrButtonsKeepsTitleInset() {
+    let bar = PopupBar(frame: CGRect(x: 0, y: 0, width: 300, height: 56))
+    bar.popupItem = PopupItem(title: "Title", subtitle: "Subtitle")
+    bar.layoutIfNeeded()
+
+    #expect(bar.imageView.isHidden)
+    #expect(bar.labelsStack.frame.minX >= 16)
+}
+
+@Test @MainActor
+func popupBarCentersSymbolArtwork() {
+    let bar = PopupBar(frame: CGRect(x: 0, y: 0, width: 300, height: 56))
+    bar.popupItem = PopupItem(image: UIImage(systemName: "doc.on.doc"))
+    bar.layoutIfNeeded()
+
+    #expect(bar.imageView.contentMode == .center)
+}
+
+@Test @MainActor
+func preferredHeightDrivesConcentricArtworkRadius() {
+    let bar = PopupBar(frame: CGRect(x: 0, y: 0, width: 300, height: 56))
+    bar.preferredHeight = 46
+    bar.frame.size.height = bar.preferredHeight
+    bar.layoutIfNeeded()
+
+    #expect(bar.intrinsicContentSize.height == 46)
+    #expect(bar.imageView.layer.cornerRadius == 15)
+}
+
+@Test @MainActor
+func fittedPopupBarUsesAttributedTitleWidth() {
+    let item = PopupItem(title: "Short")
+    item.attributedTitle = NSAttributedString(string: "2 files changed +6 −9")
+    let bar = PopupBar()
+    bar.popupItem = item
+    bar.widthMode = .fitsContent
+
+    #expect(bar.intrinsicContentSize.width > 40)
+    #expect(bar.intrinsicContentSize.width < 300)
+}
+
+@Test @MainActor
+func popupBarAccessoryStyleKeepsContentVisible() {
+    let bar = PopupBar()
+    bar.setSystemAccessoryStyle(true)
+
+    #expect(!bar.backgroundView.isHidden)
+    #expect(bar.backgroundView.effect == nil)
+}
+
+@Test @MainActor
+func popupBarInlineAccessoryFitsVisibleControls() {
+    let bar = PopupBar()
+    let item = PopupItem()
+    item.image = UIImage(systemName: "music.note")
+    item.title = "Velvet Skies"
+    item.subtitle = "The Paper Moons"
+    item.barButtonItems = [
+        UIBarButtonItem(image: UIImage(systemName: "pause.fill"), style: .plain, target: nil, action: nil),
+        UIBarButtonItem(image: UIImage(systemName: "forward.fill"), style: .plain, target: nil, action: nil)
+    ]
+    bar.popupItem = item
+
+    let regularWidth = bar.preferredContentWidth
+    bar.isInlineAccessory = true
+
+    #expect(bar.preferredContentWidth < regularWidth)
+}
+
+@Test @MainActor
+func popupBarCanDockAboveNavigationToolbar() {
+    let navigationController = UINavigationController(rootViewController: UIViewController())
+    navigationController.setToolbarHidden(false, animated: false)
+    navigationController.loadViewIfNeeded()
+    navigationController.presentPopupBar(with: UIViewController(), animated: false)
+
+    #expect(navigationController.popupBar.superview === navigationController.view)
 }
 
 @Test @MainActor

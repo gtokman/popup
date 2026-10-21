@@ -2,10 +2,27 @@ import popup
 import UIKit
 
 final class LibraryViewController: UITableViewController {
+    private let player: PlayerModel
+
+    init(player: PlayerModel) {
+        self.player = player
+        super.init(style: .plain)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Library"
         navigationController?.navigationBar.prefersLargeTitles = true
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "xmark"),
+            style: .plain,
+            target: self,
+            action: #selector(closeExample)
+        )
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "Song")
     }
 
@@ -27,10 +44,15 @@ final class LibraryViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let player = PlayerModel.shared
         player.play(Song.library[indexPath.row])
         guard let nowPlaying = player.nowPlayingViewController,
               nowPlaying.popupContainer == nil else { return }
         tabBarController?.presentPopupBar(with: nowPlaying, animated: true)
+    }
+
+    @objc private func closeExample() {
+        tabBarController?.dismissPopupBar(animated: false)
+        player.stop()
+        tabBarController?.dismiss(animated: true)
     }
 }

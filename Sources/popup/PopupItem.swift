@@ -4,9 +4,9 @@ import UIKit
 @MainActor
 public final class PopupItem {
     public var title: String? { didSet { notify() } }
+    public var attributedTitle: NSAttributedString? { didSet { notify() } }
     public var subtitle: String? { didSet { notify() } }
     public var image: UIImage? { didSet { notify() } }
-    public var progress: Float = 0 { didSet { notify() } }
     public var barButtonItems: [UIBarButtonItem] = [] { didSet { notify() } }
 
     private final class Observer {

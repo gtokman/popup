@@ -6,6 +6,15 @@ options:
 packages:
   popup:
     path: ../..
+  SnapKit:
+    url: https://github.com/SnapKit/SnapKit
+    from: 5.7.1
+  Then:
+    url: https://github.com/devxoul/Then
+    from: 3.0.0
+  UITextView-Placeholder:
+    url: https://github.com/devxoul/UITextView-Placeholder.git
+    from: 1.5.0
 targets:
   PopupExample:
     type: application
@@ -29,6 +38,12 @@ targets:
     dependencies:
       - package: popup
         product: popup
+      - package: SnapKit
+        product: SnapKit
+      - package: Then
+        product: Then
+      - package: UITextView-Placeholder
+        product: UITextView-Placeholder
     settings:
       base:
         DEVELOPMENT_TEAM: NTP2A7PJM8
