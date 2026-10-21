@@ -1,21 +1,11 @@
 import UIKit
 
 /// Morphs the popup bar into the full content (and back) as a single shared surface.
-///
-/// Scene built inside the transition container:
-/// - a morph view whose frame and corner radius travel between the bar's capsule and the full screen,
-///   backed by the bar's own material, holding a scaled snapshot of the content and a render of the
-///   bar's labels/buttons that cross-fade as it grows;
-/// - the artwork, flying between the bar's thumbnail and the content's `popupArtworkView`;
-/// - the container scaling back behind a dimming layer.
-///
-/// Everything is driven by one `UIViewPropertyAnimator`, returned from
-/// `interruptibleAnimator(using:)`, so the same animation can be scrubbed, paused and reversed.
 @MainActor
 final class PopupTransitionAnimator: NSObject, UIViewControllerAnimatedTransitioning {
     unowned let popupController: PopupController
     let isPresenting: Bool
-    private var animator: UIViewPropertyAnimator?
+    private var fallbackDriver: SpringDriver?
 
     init(popupController: PopupController, isPresenting: Bool) {
         self.popupController = popupController
@@ -27,57 +17,133 @@ final class PopupTransitionAnimator: NSObject, UIViewControllerAnimatedTransitio
     }
 
     func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
-        propertyAnimator(using: transitionContext).startAnimation()
-    }
+        let scene = makeScene(using: transitionContext)
+        if !isPresenting {
+            scene.beginCloseMorph()
+        }
+        scene.apply(progress: 0)
 
-    func interruptibleAnimator(using transitionContext: UIViewControllerContextTransitioning) -> UIViewImplicitlyAnimating {
-        propertyAnimator(using: transitionContext)
+        let spring = isPresenting ? popupController.openSpring : popupController.closeSpring
+        fallbackDriver = SpringDriver(
+            spring: spring,
+            from: 0,
+            to: 1,
+            velocity: 0,
+            onUpdate: { scene.apply(progress: $0) },
+            onComplete: { [weak self] in
+                scene.complete(reachedTarget: true)
+                transitionContext.completeTransition(true)
+                self?.fallbackDriver = nil
+            }
+        )
     }
 
     func animationEnded(_ transitionCompleted: Bool) {
-        animator = nil
+        if !transitionCompleted {
+            _ = fallbackDriver?.stop()
+            fallbackDriver = nil
+        }
     }
 
-    func propertyAnimator(using context: UIViewControllerContextTransitioning) -> UIViewPropertyAnimator {
-        if let animator { return animator }
-        let animator = makeAnimator(using: context)
-        self.animator = animator
-        return animator
+    func makeScene(using context: UIViewControllerContextTransitioning) -> PopupTransitionScene {
+        PopupTransitionScene(
+            context: context,
+            popupController: popupController,
+            isPresenting: isPresenting
+        )
+    }
+}
+
+@MainActor
+final class PopupTransitionScene {
+    private let isPresenting: Bool
+
+    private var isNoOp = false
+    private var isCloseMorphing = false
+    private var hasCompleted = false
+
+    private var containerView: UIView?
+    private var contentViewController: UIViewController?
+    private var contentView: UIView?
+    private var presenterView: UIView?
+    private var bar: PopupBar?
+    private var dimmingView: UIView?
+    private var artworkView: UIView?
+    private var morphView: UIView?
+    private var backdrop: UIVisualEffectView?
+    private var contentSnapshot: UIView?
+    private var barSnapshot: UIImageView?
+    private var flyer: UIImageView?
+
+    private var openFrame: CGRect = .zero
+    private var barFrame: CGRect = .zero
+    private var barArtworkFrame: CGRect = .zero
+    private var artworkFrame: CGRect?
+    private var openRadius: CGFloat = 0
+    private var barRadius: CGFloat = 0
+    private var artworkRadius: CGFloat = 0
+    private var barArtworkRadius: CGFloat = 0
+    private var artworkAlpha: CGFloat = 1
+    private var backgroundScale: CGFloat = 1
+    private var dimmingAlpha: CGFloat = 0
+
+    private var closeStartFrame: CGRect?
+    private var closeStartArtworkFrame: CGRect?
+    private var closeStartScale: CGFloat?
+    private var closeStartDimming: CGFloat?
+
+    var dragOffset: CGFloat = 0 {
+        didSet {
+            if !isPresenting && !isCloseMorphing {
+                apply(progress: 0)
+            }
+        }
     }
 
-    // MARK: - Scene
+    var isDragging: Bool {
+        !isNoOp && !isPresenting && !isCloseMorphing && !hasCompleted
+    }
 
-    private func makeAnimator(using context: UIViewControllerContextTransitioning) -> UIViewPropertyAnimator {
-        let timing = UISpringTimingParameters(dampingRatio: popupController.dampingRatio)
-        let animator = UIViewPropertyAnimator(duration: popupController.transitionDuration, timingParameters: timing)
+    var containerHeight: CGFloat {
+        max(containerView?.bounds.height ?? 1, 1)
+    }
 
+    init(
+        context: UIViewControllerContextTransitioning,
+        popupController: PopupController,
+        isPresenting: Bool
+    ) {
+        self.isPresenting = isPresenting
         let contentKey: UITransitionContextViewControllerKey = isPresenting ? .to : .from
         let presenterKey: UITransitionContextViewControllerKey = isPresenting ? .from : .to
         guard let content = context.viewController(forKey: contentKey),
               let presenterView = context.viewController(forKey: presenterKey)?.view else {
-            animator.addCompletion { _ in context.completeTransition(!context.transitionWasCancelled) }
-            return animator
+            isNoOp = true
+            return
         }
 
         let container = context.containerView
         let contentView = context.view(forKey: isPresenting ? .to : .from) ?? content.view!
         let presentation = content.presentationController as? PopupPresentationController
-        let controller = popupController
-        let bar = controller.bar
+        let bar = popupController.bar
 
         var openFrame = isPresenting ? context.finalFrame(for: content) : context.initialFrame(for: content)
         if openFrame.isEmpty { openFrame = container.bounds }
-        let barFrame = container.convert(PopupGeometry.restingFrame(of: bar, in: presenterView), from: presenterView.superview)
-        let barArtworkFrame = container.convert(PopupGeometry.restingFrame(of: bar.imageView, in: presenterView), from: presenterView.superview)
-        let openRadius = controller.resolvedOpenCornerRadius
+        let barFrame = container.convert(
+            PopupGeometry.restingFrame(of: bar, in: presenterView),
+            from: presenterView.superview
+        )
+        let barArtworkFrame = container.convert(
+            PopupGeometry.restingFrame(of: bar.imageView, in: presenterView),
+            from: presenterView.superview
+        )
+        let openRadius = popupController.resolvedOpenCornerRadius
         let barRadius = barFrame.height / 2
-        let backgroundScale = controller.backgroundScale
-        let dimmingAlpha = controller.dimmingAlpha
-        let isPresenting = isPresenting
-
-        // Lay the real content out at its final size so the snapshot and artwork target are exact.
+        let backgroundScale = popupController.backgroundScale
+        let dimmingAlpha = popupController.dimmingAlpha
         let artworkView = (content as? PopupContentTransitioning)?.popupArtworkView
         let artworkAlpha = artworkView?.alpha ?? 1
+
         UIView.performWithoutAnimation {
             if contentView.superview !== container {
                 if let dimming = presentation?.dimmingView, dimming.superview === container {
@@ -91,11 +157,14 @@ final class PopupTransitionAnimator: NSObject, UIViewControllerAnimatedTransitio
             contentView.frame = openFrame
             contentView.layoutIfNeeded()
         }
+
         let artworkFrame = artworkView.map { container.convert($0.bounds, from: $0) }
         let artworkImage = (artworkView as? UIImageView)?.image ?? bar.imageView.image
         let artworkRadius = artworkView?.layer.cornerRadius ?? 0
         let barArtworkRadius = bar.imageView.layer.cornerRadius
-        let flyer: UIImageView? = (artworkImage != nil && artworkFrame != nil) ? UIImageView(image: artworkImage) : nil
+        let flyer: UIImageView? = (artworkImage != nil && artworkFrame != nil)
+            ? UIImageView(image: artworkImage)
+            : nil
         if flyer != nil { artworkView?.alpha = 0 }
 
         let contentSnapshot = contentView.snapshotView(afterScreenUpdates: true) ?? UIView()
@@ -135,62 +204,175 @@ final class PopupTransitionAnimator: NSObject, UIViewControllerAnimatedTransitio
         presenterView.layer.cornerCurve = .continuous
         presenterView.layer.masksToBounds = true
 
-        func apply(open: Bool) {
-            let frame = open ? openFrame : barFrame
+        self.containerView = container
+        contentViewController = content
+        self.contentView = contentView
+        self.presenterView = presenterView
+        self.bar = bar
+        dimmingView = presentation?.dimmingView
+        self.artworkView = artworkView
+        self.morphView = morphView
+        self.backdrop = backdrop
+        self.contentSnapshot = contentSnapshot
+        self.barSnapshot = barSnapshot
+        self.flyer = flyer
+        self.openFrame = openFrame
+        self.barFrame = barFrame
+        self.barArtworkFrame = barArtworkFrame
+        self.artworkFrame = artworkFrame
+        self.openRadius = openRadius
+        self.barRadius = barRadius
+        self.artworkRadius = artworkRadius
+        self.barArtworkRadius = barArtworkRadius
+        self.artworkAlpha = artworkAlpha
+        self.backgroundScale = backgroundScale
+        self.dimmingAlpha = dimmingAlpha
+
+        apply(progress: 0)
+    }
+
+    func apply(progress: CGFloat) {
+        guard !isNoOp, !hasCompleted,
+              let morphView,
+              let backdrop,
+              let contentSnapshot,
+              let barSnapshot,
+              let presenterView else { return }
+
+        UIView.performWithoutAnimation {
+            let frame: CGRect
+            let scale: CGFloat
+            let dimming: CGFloat
+            let cornerRadius: CGFloat
+            let flyerFrame: CGRect?
+            let flyerRadius: CGFloat
+            let presenterCornerRadius: CGFloat
+
+            if !isPresenting && !isCloseMorphing {
+                let factor = Self.clamp(dragOffset / containerHeight * 1.5, 0, 1)
+                frame = openFrame.offsetBy(dx: 0, dy: dragOffset)
+                scale = Self.interpolate(backgroundScale, 1, factor)
+                dimming = dimmingAlpha * (1 - factor)
+                cornerRadius = openRadius
+                flyerFrame = artworkFrame?.offsetBy(dx: 0, dy: dragOffset)
+                flyerRadius = artworkRadius
+                presenterCornerRadius = openRadius
+            } else if isPresenting {
+                frame = Self.interpolate(barFrame, openFrame, progress)
+                scale = Self.interpolate(1, backgroundScale, progress)
+                dimming = Self.interpolate(0, dimmingAlpha, progress)
+                cornerRadius = max(0, Self.interpolate(barRadius, openRadius, progress))
+                flyerFrame = artworkFrame.map { Self.interpolate(barArtworkFrame, $0, progress) }
+                flyerRadius = max(0, Self.interpolate(barArtworkRadius, artworkRadius, progress))
+                presenterCornerRadius = max(0, Self.interpolate(0, openRadius, progress))
+            } else {
+                let startFrame = closeStartFrame ?? openFrame
+                let startArtworkFrame = closeStartArtworkFrame ?? artworkFrame
+                frame = Self.interpolate(startFrame, barFrame, progress)
+                scale = Self.interpolate(closeStartScale ?? backgroundScale, 1, progress)
+                dimming = Self.interpolate(closeStartDimming ?? dimmingAlpha, 0, progress)
+                cornerRadius = max(0, Self.interpolate(openRadius, barRadius, progress))
+                flyerFrame = startArtworkFrame.map { Self.interpolate($0, barArtworkFrame, progress) }
+                flyerRadius = max(0, Self.interpolate(artworkRadius, barArtworkRadius, progress))
+                presenterCornerRadius = max(0, Self.interpolate(openRadius, 0, progress))
+            }
+
             morphView.frame = frame
             backdrop.frame = morphView.bounds
-            morphView.layer.cornerRadius = open ? openRadius : barRadius
-            let scale = frame.width / openFrame.width
-            contentSnapshot.transform = CGAffineTransform(scaleX: scale, y: scale)
-            contentSnapshot.center = CGPoint(x: frame.width / 2, y: openFrame.height * scale / 2)
+            morphView.layer.cornerRadius = max(0, cornerRadius)
+
+            let snapshotScale = openFrame.width == 0 ? 1 : frame.width / openFrame.width
+            contentSnapshot.transform = CGAffineTransform(scaleX: snapshotScale, y: snapshotScale)
+            contentSnapshot.center = CGPoint(
+                x: frame.width / 2,
+                y: openFrame.height * snapshotScale / 2
+            )
             barSnapshot.center = CGPoint(x: frame.width / 2, y: barFrame.height / 2)
-            if let flyer, let artworkFrame {
-                flyer.frame = open ? artworkFrame : barArtworkFrame
-                flyer.layer.cornerRadius = open ? artworkRadius : barArtworkRadius
+
+            if isPresenting {
+                barSnapshot.alpha = Self.clamp(1 - progress / 0.2, 0, 1)
+                contentSnapshot.alpha = Self.clamp(progress / 0.35, 0, 1)
+            } else {
+                contentSnapshot.alpha = Self.clamp(1 - (progress - 0.45) / 0.4, 0, 1)
+                barSnapshot.alpha = Self.clamp((progress - 0.6) / 0.3, 0, 1)
             }
-            presentation?.dimmingView.alpha = open ? dimmingAlpha : 0
-            presenterView.transform = open ? CGAffineTransform(scaleX: backgroundScale, y: backgroundScale) : .identity
-            presenterView.layer.cornerRadius = open ? openRadius : 0
+
+            if let flyer, let flyerFrame {
+                flyer.frame = flyerFrame
+                flyer.layer.cornerRadius = max(0, flyerRadius)
+            }
+
+            presenterView.transform = CGAffineTransform(scaleX: scale, y: scale)
+            presenterView.layer.cornerRadius = presenterCornerRadius
+            dimmingView?.alpha = Self.clamp(dimming, 0, 1)
+        }
+    }
+
+    func beginCloseMorph() {
+        guard !isNoOp, !isPresenting, !hasCompleted else { return }
+        let factor = Self.clamp(dragOffset / containerHeight * 1.5, 0, 1)
+        closeStartFrame = openFrame.offsetBy(dx: 0, dy: dragOffset)
+        closeStartArtworkFrame = artworkFrame?.offsetBy(dx: 0, dy: dragOffset)
+        closeStartScale = Self.interpolate(backgroundScale, 1, factor)
+        closeStartDimming = dimmingAlpha * (1 - factor)
+        isCloseMorphing = true
+        apply(progress: 0)
+    }
+
+    func closeProgressVelocity(forDragVelocity velocity: CGFloat) -> CGFloat {
+        let distance = barFrame.midY - (openFrame.midY + dragOffset)
+        guard abs(distance) > 0.001 else { return 0 }
+        return velocity / distance
+    }
+
+    func complete(reachedTarget: Bool) {
+        guard !isNoOp, !hasCompleted,
+              let morphView,
+              let contentView,
+              let presenterView,
+              let bar else { return }
+
+        let isOpen = reachedTarget == isPresenting
+        if !isPresenting && !reachedTarget {
+            isCloseMorphing = false
+            closeStartFrame = nil
+            closeStartArtworkFrame = nil
+            closeStartScale = nil
+            closeStartDimming = nil
+            dragOffset = 0
         }
 
         UIView.performWithoutAnimation {
-            apply(open: !isPresenting)
-            contentSnapshot.alpha = isPresenting ? 0 : 1
-            barSnapshot.alpha = isPresenting ? 1 : 0
+            apply(progress: reachedTarget ? 1 : 0)
+            morphView.removeFromSuperview()
+            flyer?.removeFromSuperview()
+            artworkView?.alpha = artworkAlpha
+            contentView.alpha = 1
+            if isOpen {
+                contentView.frame = openFrame
+            } else {
+                contentView.removeFromSuperview()
+                presenterView.layer.masksToBounds = false
+            }
+            bar.alpha = isOpen ? 0 : 1
         }
+        hasCompleted = true
+    }
 
-        animator.addAnimations {
-            apply(open: isPresenting)
-        }
-        animator.addAnimations {
-            UIView.animateKeyframes(withDuration: 0, delay: 0, options: [.calculationModeLinear]) {
-                if isPresenting {
-                    UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 0.2) { barSnapshot.alpha = 0 }
-                    UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 0.35) { contentSnapshot.alpha = 1 }
-                } else {
-                    UIView.addKeyframe(withRelativeStartTime: 0.45, relativeDuration: 0.4) { contentSnapshot.alpha = 0 }
-                    UIView.addKeyframe(withRelativeStartTime: 0.6, relativeDuration: 0.3) { barSnapshot.alpha = 1 }
-                }
-            }
-        }
-        animator.addCompletion { position in
-            let isOpen = (position == .end) == isPresenting
-            UIView.performWithoutAnimation {
-                apply(open: isOpen)
-                morphView.removeFromSuperview()
-                flyer?.removeFromSuperview()
-                artworkView?.alpha = artworkAlpha
-                contentView.alpha = 1
-                if isOpen {
-                    contentView.frame = openFrame
-                } else {
-                    contentView.removeFromSuperview()
-                    presenterView.layer.masksToBounds = false
-                }
-                bar.alpha = isOpen ? 0 : 1
-            }
-            context.completeTransition(!context.transitionWasCancelled)
-        }
-        return animator
+    private static func interpolate(_ from: CGFloat, _ to: CGFloat, _ progress: CGFloat) -> CGFloat {
+        from + (to - from) * progress
+    }
+
+    private static func interpolate(_ from: CGRect, _ to: CGRect, _ progress: CGFloat) -> CGRect {
+        CGRect(
+            x: interpolate(from.minX, to.minX, progress),
+            y: interpolate(from.minY, to.minY, progress),
+            width: interpolate(from.width, to.width, progress),
+            height: interpolate(from.height, to.height, progress)
+        )
+    }
+
+    private static func clamp(_ value: CGFloat, _ lowerBound: CGFloat, _ upperBound: CGFloat) -> CGFloat {
+        min(max(value, lowerBound), upperBound)
     }
 }

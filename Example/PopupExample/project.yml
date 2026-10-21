@@ -18,6 +18,7 @@ targets:
     info:
       path: Sources/PopupExample/Info.plist
       properties:
+        CADisableMinimumFrameDurationOnPhone: true
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false

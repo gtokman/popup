@@ -4,8 +4,8 @@ import UIKit
 ///
 /// Opening is a real custom modal presentation: the content controller is presented with
 /// `modalPresentationStyle = .custom`, a `PopupPresentationController`, a
-/// `UIViewControllerAnimatedTransitioning` animator that vends an interruptible
-/// `UIViewPropertyAnimator`, and a `UIViewControllerInteractiveTransitioning` driver.
+/// `UIViewControllerAnimatedTransitioning` scene animator, and a
+/// `UIViewControllerInteractiveTransitioning` spring driver.
 /// One pan gesture can start, scrub, interrupt and reverse the transition at any point.
 @MainActor
 public final class PopupController: NSObject {
@@ -22,7 +22,9 @@ public final class PopupController: NSObject {
 
     /// Settling duration of the spring used for taps and gesture releases.
     public var transitionDuration: TimeInterval = 0.55
-    public var dampingRatio: CGFloat = 0.86
+    public var openSpring: PopupSpring = .open
+    public var closeSpring: PopupSpring = .close
+    public var settleSpring: PopupSpring = .settle
     /// Scale applied to the container while the popup is open.
     public var backgroundScale: CGFloat = 0.94
     public var dimmingAlpha: CGFloat = 0.25
@@ -33,6 +35,7 @@ public final class PopupController: NSObject {
     var interaction: PopupInteractionController?
 
     private var gestureStartFraction: CGFloat = 0
+    private var gestureStartDragOffset: CGFloat = 0
     private var trackedScrollViews = NSHashTable<UIScrollView>.weakObjects()
     private var barBottomConstraint: NSLayoutConstraint?
     private var pendingCompletion: (() -> Void)?
@@ -251,28 +254,54 @@ public final class PopupController: NSObject {
         case .began:
             if let interaction, interaction.isActive {
                 gestureStartFraction = interaction.pause()
+                if interaction.isDragging {
+                    gestureStartDragOffset = interaction.dragOffset
+                }
             } else if gesture === barPanGesture, beginOpen(animated: true, interactive: true, completion: nil) {
                 gestureStartFraction = 0
+                gestureStartDragOffset = 0
             } else if gesture === contentPanGesture, state == .open {
                 cancelTrackedScrolling()
                 beginClose(animated: true, interactive: true, completion: nil)
                 gestureStartFraction = 0
+                gestureStartDragOffset = 0
             } else {
                 gesture.isEnabled = false
                 gesture.isEnabled = true
             }
         case .changed:
             guard let interaction else { return }
+            if !interaction.isPresenting, interaction.isDragging {
+                let offset = PopupGestureMath.rubberBandedOffset(
+                    translation: gestureStartDragOffset + gesture.translation(in: space).y,
+                    height: interaction.containerHeight
+                )
+                interaction.updateDrag(offset: offset)
+                return
+            }
             let delta = progressDelta(gesture.translation(in: space).y, presenting: interaction.isPresenting)
             interaction.update(min(max(gestureStartFraction + delta, 0), 1))
         case .ended, .cancelled, .failed:
             guard let interaction else { return }
+            if !interaction.isPresenting, interaction.isDragging {
+                let offset = PopupGestureMath.rubberBandedOffset(
+                    translation: gestureStartDragOffset + gesture.translation(in: space).y,
+                    height: interaction.containerHeight
+                )
+                let fraction = offset / transitionTravel
+                let velocity = gesture.velocity(in: space).y / transitionTravel
+                interaction.finishDrag(
+                    complete: PopupGestureMath.shouldComplete(fraction: fraction, velocity: velocity),
+                    velocity: gesture.velocity(in: space).y
+                )
+                return
+            }
             let velocity = progressDelta(gesture.velocity(in: space).y, presenting: interaction.isPresenting)
             let fraction = min(max(gestureStartFraction + progressDelta(gesture.translation(in: space).y, presenting: interaction.isPresenting), 0), 1)
             let complete = gesture.state == .ended
                 ? PopupGestureMath.shouldComplete(fraction: fraction, velocity: velocity)
                 : fraction > 0.5
-            interaction.finish(complete: complete, velocity: velocity, dampingRatio: dampingRatio)
+            interaction.finish(complete: complete, velocity: velocity)
         default:
             break
         }
