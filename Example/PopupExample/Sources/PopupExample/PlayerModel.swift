@@ -6,7 +6,7 @@ final class PlayerModel {
     private(set) var currentSong: Song?
     private(set) var isPlaying = false
     private(set) var elapsedTime: TimeInterval = 0
-    weak var nowPlayingViewController: NowPlayingViewController?
+    var nowPlayingViewController: NowPlayingViewController?
     private var timer: Timer?
 
     private init() {}
