@@ -34,6 +34,24 @@ func removingObserverStopsNotifications() {
 }
 
 @Test @MainActor
+func popupGeometryRestingFrameIgnoresPresenterScale() {
+    let root = UIView(frame: CGRect(x: 0, y: 0, width: 400, height: 800))
+    let presenter = UIView(frame: CGRect(x: 20, y: 30, width: 300, height: 700))
+    root.addSubview(presenter)
+    let bar = UIView(frame: CGRect(x: 15, y: 620, width: 270, height: 56))
+    presenter.addSubview(bar)
+
+    presenter.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+
+    let restingFrame = PopupGeometry.restingFrame(of: bar, in: presenter)
+    let liveFrame = bar.convert(bar.bounds, to: root)
+    #expect(abs(restingFrame.minX - 35) < 0.001)
+    #expect(abs(restingFrame.minY - 650) < 0.001)
+    #expect(restingFrame.size == bar.bounds.size)
+    #expect(liveFrame != restingFrame)
+}
+
+@Test @MainActor
 func popupBarWithoutArtworkOrButtonsKeepsTitleInset() {
     let bar = PopupBar(frame: CGRect(x: 0, y: 0, width: 300, height: 56))
     bar.popupItem = PopupItem(title: "Title", subtitle: "Subtitle")

@@ -3,6 +3,7 @@ import UIKit
 final class ExamplesViewController: UITableViewController {
     private enum Example: CaseIterable {
         case appleMusic
+        case appleMusicTabAccessory
         case tasks
         case agentChat
         case codingFiles
@@ -10,6 +11,7 @@ final class ExamplesViewController: UITableViewController {
         var title: String {
             switch self {
             case .appleMusic: "Apple Music"
+            case .appleMusicTabAccessory: "Apple Music · Tab accessory (iOS 26)"
             case .tasks: "Tasks"
             case .agentChat: "Agent chat · Tasks"
             case .codingFiles: "Coding · Files changed"
@@ -19,6 +21,7 @@ final class ExamplesViewController: UITableViewController {
         var subtitle: String {
             switch self {
             case .appleMusic: "An artwork-led music player"
+            case .appleMusicTabAccessory: "A searchable library with an inline popup accessory"
             case .tasks: "A checklist with live popup updates"
             case .agentChat: "A task popup above a growing chat composer"
             case .codingFiles: "A compact change-summary popup above the composer"
@@ -29,6 +32,8 @@ final class ExamplesViewController: UITableViewController {
             switch self {
             case .appleMusic:
                 return AppleMusicExampleViewController()
+            case .appleMusicTabAccessory:
+                return AppleMusicAccessoryExampleViewController()
             case .tasks:
                 let navigationController = UINavigationController(rootViewController: TasksDashboardViewController())
                 navigationController.overrideUserInterfaceStyle = .dark

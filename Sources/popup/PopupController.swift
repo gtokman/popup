@@ -63,8 +63,6 @@ public final class PopupController: NSObject {
     private var barCenterXConstraint: NSLayoutConstraint?
     private var barWidthConstraint: NSLayoutConstraint?
     private var barMaximumWidthConstraint: NSLayoutConstraint?
-    private var barAccessoryWidthConstraint: NSLayoutConstraint?
-    private var barAccessoryFitWidthConstraint: NSLayoutConstraint?
     private var barHeightConstraint: NSLayoutConstraint?
     private var accessoryTransitionContainer: UIView?
     private var isUsingTabBarAccessory = false
@@ -99,17 +97,19 @@ public final class PopupController: NSObject {
             self?.barLeadingConstraint?.constant = margin
             self?.barTrailingConstraint?.constant = -margin
             self?.barMaximumWidthConstraint?.constant = -2 * margin
-            self?.barAccessoryWidthConstraint?.constant = -2 * margin
         }
         bar.widthModeDidChange = { [weak self] _ in self?.updateBarWidthConstraints() }
         bar.preferredContentWidthDidChange = { [weak self] width in
             self?.barWidthConstraint?.constant = width
-            self?.barAccessoryFitWidthConstraint?.constant = width
         }
         if #available(iOS 26.0, *), containerViewController is UITabBarController {
             bar.registerForTraitChanges([UITraitTabAccessoryEnvironment.self]) { [weak self] (bar: PopupBar, _) in
-                bar.isInlineAccessory = bar.traitCollection.tabAccessoryEnvironment == .inline
-                self?.updateBarWidthConstraints()
+                guard self?.isUsingTabBarAccessory == true else { return }
+                UIView.performWithoutAnimation {
+                    bar.isInlineAccessory = bar.traitCollection.tabAccessoryEnvironment == .inline
+                    bar.setNeedsLayout()
+                    bar.layoutIfNeeded()
+                }
             }
         }
         bar.addGestureRecognizer(barTapGesture)
@@ -200,15 +200,7 @@ public final class PopupController: NSObject {
             isUsingTabBarAccessory = true
             bar.setSystemAccessoryStyle(true)
             tabBarController.setBottomAccessory(UITabAccessory(contentView: bar), animated: true)
-            barAccessoryWidthConstraint = bar.widthAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.widthAnchor,
-                constant: -2 * bar.horizontalMargin
-            )
-            barAccessoryWidthConstraint?.priority = .defaultHigh
-            barAccessoryFitWidthConstraint = bar.widthAnchor.constraint(equalToConstant: bar.preferredContentWidth)
-            barAccessoryFitWidthConstraint?.priority = .required
             bar.isInlineAccessory = tabBarController.traitCollection.tabAccessoryEnvironment == .inline
-            updateBarWidthConstraints()
             return
         }
         isUsingTabBarAccessory = false
@@ -266,13 +258,7 @@ public final class PopupController: NSObject {
     }
 
     private func updateBarWidthConstraints() {
-        if isUsingTabBarAccessory {
-            let usesFitWidth = bar.widthMode == .fitsContent || bar.isInlineAccessory
-            barAccessoryWidthConstraint?.isActive = !usesFitWidth
-            barAccessoryFitWidthConstraint?.constant = bar.preferredContentWidth
-            barAccessoryFitWidthConstraint?.isActive = usesFitWidth
-            return
-        }
+        if isUsingTabBarAccessory { return }
         guard barWidthConstraint != nil else { return }
         let fitsContent = bar.widthMode == .fitsContent
         barLeadingConstraint?.isActive = !fitsContent
@@ -304,10 +290,6 @@ public final class PopupController: NSObject {
         barCenterXConstraint = nil
         barWidthConstraint = nil
         barMaximumWidthConstraint = nil
-        barAccessoryWidthConstraint?.isActive = false
-        barAccessoryWidthConstraint = nil
-        barAccessoryFitWidthConstraint?.isActive = false
-        barAccessoryFitWidthConstraint = nil
         barHeightConstraint = nil
     }
 

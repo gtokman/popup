@@ -24,6 +24,46 @@ final class SearchViewController: UITableViewController {
     }
 }
 
+final class TabAccessorySearchViewController: UITableViewController, UISearchResultsUpdating {
+    private let songs = Song.library
+    private var filteredSongs = Song.library
+    private let searchController = UISearchController(searchResultsController: nil)
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "Search"
+        navigationItem.searchController = searchController
+        navigationItem.hidesSearchBarWhenScrolling = false
+        searchController.searchResultsUpdater = self
+        searchController.obscuresBackgroundDuringPresentation = false
+        definesPresentationContext = true
+        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "SearchResult")
+    }
+
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        filteredSongs.count
+    }
+
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "SearchResult", for: indexPath)
+        let song = filteredSongs[indexPath.row]
+        var content = cell.defaultContentConfiguration()
+        content.text = song.title
+        content.secondaryText = song.artist
+        content.image = UIImage(systemName: "music.note")
+        cell.contentConfiguration = content
+        return cell
+    }
+
+    func updateSearchResults(for searchController: UISearchController) {
+        let query = searchController.searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        filteredSongs = query.isEmpty
+            ? songs
+            : songs.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query) }
+        tableView.reloadData()
+    }
+}
+
 final class RadioViewController: UICollectionViewController {
     private let stations = ["Chill", "Indie", "Focus", "Acoustic", "Discovery", "Classics"]
 

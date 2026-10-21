@@ -131,8 +131,8 @@ final class PopupTransitionScene {
 
         var openFrame = isPresenting ? context.finalFrame(for: content) : context.initialFrame(for: content)
         if openFrame.isEmpty { openFrame = container.bounds }
-        let barFrame = bar.convert(bar.bounds, to: container)
-        let barArtworkFrame = bar.imageView.convert(bar.imageView.bounds, to: container)
+        let barFrame = Self.restingFrame(of: bar, in: presenterView, container: container)
+        let barArtworkFrame = Self.restingFrame(of: bar.imageView, in: presenterView, container: container)
         let openRadius = popupController.resolvedOpenCornerRadius
         let barRadius = barFrame.height / 2
         let backgroundScale = popupController.backgroundScale
@@ -384,6 +384,15 @@ final class PopupTransitionScene {
             width: interpolate(from.width, to.width, progress),
             height: interpolate(from.height, to.height, progress)
         )
+    }
+
+    private static func restingFrame(of view: UIView, in presenter: UIView, container: UIView) -> CGRect {
+        guard view.isDescendant(of: presenter), let presenterSuperview = presenter.superview else {
+            assertionFailure("Popup bar and artwork must be descendants of the presenter view")
+            return view.convert(view.bounds, to: container)
+        }
+        let frame = PopupGeometry.restingFrame(of: view, in: presenter)
+        return container.convert(frame, from: presenterSuperview)
     }
 
     private static func clamp(_ value: CGFloat, _ lowerBound: CGFloat, _ upperBound: CGFloat) -> CGFloat {

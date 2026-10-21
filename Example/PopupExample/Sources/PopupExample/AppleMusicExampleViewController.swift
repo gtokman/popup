@@ -5,9 +5,7 @@ final class AppleMusicExampleViewController: UITabBarController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        if #available(iOS 26.0, *) {
-            tabBarMinimizeBehavior = .onScrollDown
-        }
+        popupController.usesTabBarAccessory = false
 
         let nowPlaying = NowPlayingViewController(player: player)
         player.nowPlayingViewController = nowPlaying
@@ -22,5 +20,38 @@ final class AppleMusicExampleViewController: UITabBarController {
         radio.tabBarItem = UITabBarItem(title: "Radio", image: UIImage(systemName: "dot.radiowaves.left.and.right"), tag: 2)
 
         viewControllers = [library, search, radio]
+    }
+}
+
+final class AppleMusicAccessoryExampleViewController: UITabBarController {
+    private let player = PlayerModel()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        popupController.usesTabBarAccessory = true
+        if #available(iOS 26.0, *) {
+            tabBarMinimizeBehavior = .onScrollDown
+        }
+
+        let nowPlaying = NowPlayingViewController(player: player)
+        player.nowPlayingViewController = nowPlaying
+
+        let library = UINavigationController(rootViewController: LibraryViewController(player: player))
+        let libraryTab = UITab(
+            title: "Library",
+            image: UIImage(systemName: "books.vertical"),
+            identifier: "library",
+            viewControllerProvider: { _ in library }
+        )
+        let radioTab = UITab(
+            title: "Radio",
+            image: UIImage(systemName: "dot.radiowaves.left.and.right"),
+            identifier: "radio",
+            viewControllerProvider: { _ in RadioViewController() }
+        )
+        let searchTab = UISearchTab(viewControllerProvider: { _ in
+            UINavigationController(rootViewController: TabAccessorySearchViewController())
+        })
+        tabs = [libraryTab, radioTab, searchTab]
     }
 }

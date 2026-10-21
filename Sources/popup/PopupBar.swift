@@ -51,7 +51,10 @@ public final class PopupBar: UIView {
     private var itemSide: CGFloat { max(preferredHeight - Self.contentInset * 2, 0) }
     private var textOnlyFitHorizontalPadding: CGFloat { max(preferredHeight / 2 - 4, 0) }
     var isInlineAccessory = false {
-        didSet { updateInlineAccessoryVisibility() }
+        didSet {
+            updateInlineAccessoryVisibility()
+            invalidateIntrinsicContentSize()
+        }
     }
     var preferredHeightDidChange: ((CGFloat) -> Void)?
     var horizontalMarginDidChange: ((CGFloat) -> Void)?
@@ -60,6 +63,7 @@ public final class PopupBar: UIView {
 
     private var imageSizeConstraints: [NSLayoutConstraint] = []
     private var buttonSizeConstraints: [NSLayoutConstraint] = []
+    private var isSystemAccessoryStyle = false
 
     var preferredContentWidth: CGFloat {
         let hasImage = popupItem?.image != nil
@@ -82,7 +86,7 @@ public final class PopupBar: UIView {
 
     public override var intrinsicContentSize: CGSize {
         CGSize(
-            width: widthMode == .fitsContent ? preferredContentWidth : UIView.noIntrinsicMetric,
+            width: widthMode == .fitsContent || isSystemAccessoryStyle ? preferredContentWidth : UIView.noIntrinsicMetric,
             height: preferredHeight
         )
     }
@@ -299,6 +303,8 @@ public final class PopupBar: UIView {
     }
 
     func setSystemAccessoryStyle(_ enabled: Bool) {
+        isSystemAccessoryStyle = enabled
+        invalidateIntrinsicContentSize()
         backgroundView.isHidden = false
         backgroundView.effect = enabled ? nil : Self.backgroundEffect()
         layer.shadowOpacity = enabled ? 0 : 0.12
