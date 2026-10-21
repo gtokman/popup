@@ -1,8 +1,60 @@
+import UIKit
 import Testing
 @testable import popup
 
-@Test func example() async throws {
-    // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-    // Swift Testing Documentation
-    // https://developer.apple.com/documentation/testing
+private final class ObserverOwner {}
+
+@Test @MainActor
+func observerReceivesEveryPropertyChange() {
+    let item = PopupItem()
+    let owner = ObserverOwner()
+    var notifications = 0
+    item.addObserver(owner) { _ in notifications += 1 }
+
+    item.title = "Title"
+    item.subtitle = "Subtitle"
+    item.image = UIImage(systemName: "music.note")
+    item.progress = 0.5
+    item.barButtonItems = [UIBarButtonItem(image: UIImage(systemName: "play.fill"), style: .plain, target: nil, action: nil)]
+
+    #expect(notifications == 5)
+}
+
+@Test @MainActor
+func removingObserverStopsNotifications() {
+    let item = PopupItem()
+    let owner = ObserverOwner()
+    var notifications = 0
+    item.addObserver(owner) { _ in notifications += 1 }
+    item.removeObserver(owner)
+
+    item.title = "Title"
+
+    #expect(notifications == 0)
+}
+
+@Test @MainActor
+func viewControllerPopupItemIsStable() {
+    let viewController = UIViewController()
+
+    #expect(viewController.popupItem === viewController.popupItem)
+}
+
+@Test @MainActor
+func marqueeScrollsOnlyWhenEnabledAndTextOverflows() {
+    let marqueeLabel = MarqueeLabel(frame: CGRect(x: 0, y: 0, width: 100, height: 30))
+    marqueeLabel.text = "Hi"
+    marqueeLabel.layoutIfNeeded()
+
+    #expect(marqueeLabel.isScrolling == false)
+
+    marqueeLabel.text = "Somewhere Between the Static and the Sea (Extended Mix)"
+    marqueeLabel.layoutIfNeeded()
+
+    #expect(marqueeLabel.isScrolling == true)
+
+    marqueeLabel.isScrollEnabled = false
+    marqueeLabel.layoutIfNeeded()
+
+    #expect(marqueeLabel.isScrolling == false)
 }

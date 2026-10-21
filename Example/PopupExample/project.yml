@@ -1,0 +1,37 @@
+name: PopupExample
+options:
+  bundleIdPrefix: com.gtokman.popup
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  popup:
+    path: ../..
+targets:
+  PopupExample:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources/PopupExample
+        excludes:
+          - Info.plist
+    info:
+      path: Sources/PopupExample/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+    dependencies:
+      - package: popup
+        product: popup
+    settings:
+      base:
+        DEVELOPMENT_TEAM: NTP2A7PJM8
+        GENERATE_INFOPLIST_FILE: NO
+        PRODUCT_BUNDLE_IDENTIFIER: com.gtokman.popup.example
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
