@@ -11,7 +11,7 @@
 		3BA30ADB76E69FE6E02BF7B5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0E2B8DDD9358203C255C85 /* AppDelegate.swift */; };
 		5ED732D26D8B01782795AE67 /* LibraryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93C97164CDC37C8AD0BB2D8C /* LibraryViewController.swift */; };
 		7BA5948C4FF2079767F93710 /* NowPlayingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE0B234597F6D1DDC1BE249 /* NowPlayingViewController.swift */; };
-		9753FF7C17E459FDD9EDFFA9 /* Popup in Frameworks */ = {isa = PBXBuildFile; productRef = 5EFA3B31961149F521A11844 /* Popup */; };
+		9753FF7C17E459FDD9EDFFA9 /* popup in Frameworks */ = {isa = PBXBuildFile; productRef = 068CD7F777A416AED1058B39 /* popup */; };
 		A4F5DB1C352A6D0D18661757 /* PlaceholderViewControllers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3F3EAA5830BFDA55918EFD /* PlaceholderViewControllers.swift */; };
 		CAD30B776063BFBA61025F90 /* PlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4724AD317315C414BF07A746 /* PlayerModel.swift */; };
 		CF329CFC54FD8C0E9BF91055 /* Song.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB3EEDBC7F4D20E91C0F0C6 /* Song.swift */; };
@@ -36,7 +36,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9753FF7C17E459FDD9EDFFA9 /* Popup in Frameworks */,
+				9753FF7C17E459FDD9EDFFA9 /* popup in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -100,7 +100,7 @@
 			);
 			name = PopupExample;
 			packageProductDependencies = (
-				5EFA3B31961149F521A11844 /* Popup */,
+				068CD7F777A416AED1058B39 /* popup */,
 			);
 			productName = PopupExample;
 			productReference = 0C37F3E872AE4CA5559FA8CB /* PopupExample.app */;
@@ -351,9 +351,9 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		5EFA3B31961149F521A11844 /* Popup */ = {
+		068CD7F777A416AED1058B39 /* popup */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Popup;
+			productName = popup;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

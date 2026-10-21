@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 final class PlayerModel {
     static let shared = PlayerModel()
 
@@ -57,16 +58,22 @@ final class PlayerModel {
     private func startTimer() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self, let song = self.currentSong else { return }
-            self.elapsedTime += 1
-            if self.elapsedTime >= song.duration {
-                self.elapsedTime = 0
-                self.isPlaying = false
-                self.timer?.invalidate()
-                self.timer = nil
+            Task { @MainActor [weak self] in
+                self?.tick()
             }
-            self.updateNowPlaying()
         }
+    }
+
+    private func tick() {
+        guard let song = currentSong else { return }
+        elapsedTime += 1
+        if elapsedTime >= song.duration {
+            elapsedTime = 0
+            isPlaying = false
+            timer?.invalidate()
+            timer = nil
+        }
+        updateNowPlaying()
     }
 
     private func updateNowPlaying() {

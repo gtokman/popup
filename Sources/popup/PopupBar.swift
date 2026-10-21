@@ -47,10 +47,6 @@ public final class PopupBar: UIView {
         configureView()
     }
 
-    deinit {
-        popupItem?.removeObserver(self)
-    }
-
     public override func layoutSubviews() {
         super.layoutSubviews()
         backgroundView.layer.cornerRadius = cornerRadius

@@ -7,6 +7,7 @@ import UIKit
 /// `UIViewControllerAnimatedTransitioning` animator that vends an interruptible
 /// `UIViewPropertyAnimator`, and a `UIViewControllerInteractiveTransitioning` driver.
 /// One pan gesture can start, scrub, interrupt and reverse the transition at any point.
+@MainActor
 public final class PopupController: NSObject {
     public enum State: Equatable {
         case hidden
@@ -375,6 +376,7 @@ extension UIScreen {
     }
 }
 
+@MainActor
 enum PopupGeometry {
     /// The frame `view` occupies in `presenter`'s untransformed window space, ignoring any
     /// scale applied to the presenter while the popup is open.

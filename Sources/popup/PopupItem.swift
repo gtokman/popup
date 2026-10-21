@@ -1,6 +1,7 @@
 import ObjectiveC
 import UIKit
 
+@MainActor
 public final class PopupItem {
     public var title: String? { didSet { notify() } }
     public var subtitle: String? { didSet { notify() } }
@@ -46,6 +47,7 @@ public final class PopupItem {
     }
 }
 
+@MainActor
 private var popupItemAssociationKey: UInt8 = 0
 
 extension UIViewController {

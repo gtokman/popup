@@ -1,9 +1,12 @@
 import ObjectiveC
 import UIKit
 
+@MainActor
 private var popupControllerKey: UInt8 = 0
+@MainActor
 private var popupContainerKey: UInt8 = 0
 
+@MainActor
 private final class WeakViewControllerBox {
     weak var value: UIViewController?
     init(_ value: UIViewController?) { self.value = value }

@@ -4,6 +4,7 @@ import UIKit
 ///
 /// Vended for every popup transition: when `wantsInteractiveStart` is false the animation
 /// starts on its own and the user can still grab it mid-flight, scrub it, and fling it either way.
+@MainActor
 final class PopupInteractionController: NSObject, UIViewControllerInteractiveTransitioning {
     let isPresenting: Bool
     let wantsInteractiveStart: Bool

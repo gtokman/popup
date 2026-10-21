@@ -11,6 +11,7 @@ import UIKit
 ///
 /// Everything is driven by one `UIViewPropertyAnimator`, returned from
 /// `interruptibleAnimator(using:)`, so the same animation can be scrubbed, paused and reversed.
+@MainActor
 final class PopupTransitionAnimator: NSObject, UIViewControllerAnimatedTransitioning {
     unowned let popupController: PopupController
     let isPresenting: Bool
