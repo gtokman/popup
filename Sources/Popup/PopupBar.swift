@@ -5,6 +5,12 @@ public final class PopupBar: UIView {
 
     public var horizontalMargin: CGFloat = 12
 
+    /// Padding between the capsule edge and the artwork / trailing buttons.
+    /// Inner radii are derived from it so every item stays concentric with the bar.
+    public static let contentInset: CGFloat = 8
+
+    private static let itemSide = height - contentInset * 2
+
     public var cornerRadius: CGFloat {
         bounds.height / 2
     }
@@ -48,6 +54,9 @@ public final class PopupBar: UIView {
     public override func layoutSubviews() {
         super.layoutSubviews()
         backgroundView.layer.cornerRadius = cornerRadius
+        let concentricRadius = max(cornerRadius - Self.contentInset, 0)
+        imageView.layer.cornerRadius = concentricRadius
+        buttonsStack.arrangedSubviews.forEach { $0.layer.cornerRadius = concentricRadius }
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: cornerRadius).cgPath
     }
 
@@ -70,7 +79,7 @@ public final class PopupBar: UIView {
 
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 8
+        imageView.layer.cornerRadius = Self.itemSide / 2
         imageView.layer.cornerCurve = .continuous
         imageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(imageView)
@@ -93,7 +102,7 @@ public final class PopupBar: UIView {
 
         buttonsStack.axis = .horizontal
         buttonsStack.alignment = .center
-        buttonsStack.spacing = 2
+        buttonsStack.spacing = 0
         buttonsStack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(buttonsStack)
 
@@ -121,15 +130,15 @@ public final class PopupBar: UIView {
             contentView.trailingAnchor.constraint(equalTo: backgroundView.contentView.trailingAnchor),
             contentView.topAnchor.constraint(equalTo: backgroundView.contentView.topAnchor),
             contentView.bottomAnchor.constraint(equalTo: backgroundView.contentView.bottomAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Self.contentInset),
             imageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            imageView.widthAnchor.constraint(equalToConstant: 40),
-            imageView.heightAnchor.constraint(equalToConstant: 40),
+            imageView.widthAnchor.constraint(equalToConstant: Self.itemSide),
+            imageView.heightAnchor.constraint(equalToConstant: Self.itemSide),
             labelsStack.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 10),
             labelsStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             buttonsStack.leadingAnchor.constraint(greaterThanOrEqualTo: labelsStack.trailingAnchor, constant: 8),
-            buttonsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-            buttonsStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor, constant: -1),
+            buttonsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Self.contentInset),
+            buttonsStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             labelsStack.trailingAnchor.constraint(lessThanOrEqualTo: buttonsStack.leadingAnchor, constant: -8),
             progressView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             progressView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
@@ -167,10 +176,12 @@ public final class PopupBar: UIView {
             button.tintColor = .label
             button.contentHorizontalAlignment = .center
             button.imageView?.contentMode = .scaleAspectFit
+            button.layer.cornerCurve = .continuous
+            button.layer.cornerRadius = max(cornerRadius - Self.contentInset, 0)
             button.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
-                button.widthAnchor.constraint(equalToConstant: 36),
-                button.heightAnchor.constraint(equalToConstant: 36)
+                button.widthAnchor.constraint(equalToConstant: Self.itemSide),
+                button.heightAnchor.constraint(equalToConstant: Self.itemSide)
             ])
             buttonsStack.addArrangedSubview(button)
         }
