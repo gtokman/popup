@@ -39,3 +39,22 @@ func viewControllerPopupItemIsStable() {
 
     #expect(viewController.popupItem === viewController.popupItem)
 }
+
+@Test @MainActor
+func marqueeScrollsOnlyWhenEnabledAndTextOverflows() {
+    let marqueeLabel = MarqueeLabel(frame: CGRect(x: 0, y: 0, width: 100, height: 30))
+    marqueeLabel.text = "Hi"
+    marqueeLabel.layoutIfNeeded()
+
+    #expect(marqueeLabel.isScrolling == false)
+
+    marqueeLabel.text = "Somewhere Between the Static and the Sea (Extended Mix)"
+    marqueeLabel.layoutIfNeeded()
+
+    #expect(marqueeLabel.isScrolling == true)
+
+    marqueeLabel.isScrollEnabled = false
+    marqueeLabel.layoutIfNeeded()
+
+    #expect(marqueeLabel.isScrolling == false)
+}

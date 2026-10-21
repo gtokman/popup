@@ -5,6 +5,13 @@ public final class PopupBar: UIView {
 
     public var horizontalMargin: CGFloat = 12
 
+    public var marqueeScrollEnabled = true {
+        didSet {
+            titleLabel.isScrollEnabled = marqueeScrollEnabled
+            subtitleLabel.isScrollEnabled = marqueeScrollEnabled
+        }
+    }
+
     /// Padding between the capsule edge and the artwork / trailing buttons.
     /// Inner radii are derived from it so every item stays concentric with the bar.
     public static let contentInset: CGFloat = 8
@@ -29,8 +36,8 @@ public final class PopupBar: UIView {
     public let contentView = UIView()
     public let imageView = UIImageView()
 
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
+    private let titleLabel = MarqueeLabel()
+    private let subtitleLabel = MarqueeLabel()
     private let labelsStack = UIStackView()
     private let buttonsStack = UIStackView()
     private let progressView = UIProgressView(progressViewStyle: .default)
@@ -85,10 +92,8 @@ public final class PopupBar: UIView {
             weight: .semibold
         )
         titleLabel.textColor = .label
-        titleLabel.numberOfLines = 1
         subtitleLabel.font = .preferredFont(forTextStyle: .footnote)
         subtitleLabel.textColor = .secondaryLabel
-        subtitleLabel.numberOfLines = 1
         labelsStack.axis = .vertical
         labelsStack.spacing = 1
         labelsStack.addArrangedSubview(titleLabel)

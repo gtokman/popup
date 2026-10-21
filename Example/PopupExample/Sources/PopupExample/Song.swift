@@ -12,7 +12,12 @@ struct Song: Equatable, Identifiable {
 
     static let library: [Song] = [
         Song(title: "Velvet Skies", artist: "The Paper Moons", artworkIndex: 0, duration: 218),
-        Song(title: "Slow Motion", artist: "Mira Sol", artworkIndex: 1, duration: 196),
+        Song(
+            title: "Somewhere Between the Static and the Sea (Extended Mix)",
+            artist: "The Sunday Hours & The Paper Moons Orchestra",
+            artworkIndex: 1,
+            duration: 196
+        ),
         Song(title: "Pacific Avenue", artist: "Golden State", artworkIndex: 2, duration: 243),
         Song(title: "Afterglow", artist: "June Wilder", artworkIndex: 3, duration: 205),
         Song(title: "Little by Little", artist: "The Sunday Hours", artworkIndex: 4, duration: 232),
