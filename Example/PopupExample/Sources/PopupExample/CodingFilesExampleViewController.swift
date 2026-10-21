@@ -33,7 +33,7 @@ final class CodingFilesExampleViewController: UIViewController {
         guard !didPresentPopup, let navigationController else { return }
         didPresentPopup = true
         navigationController.setToolbarHidden(true, animated: false)
-        navigationController.popupBar.preferredHeight = 35
+        navigationController.popupBar.preferredHeight = 40
         navigationController.popupBar.horizontalMargin = 13
         navigationController.popupBar.widthMode = .fitsContent
         navigationController.popupBar.showsImageBackground = false
@@ -131,8 +131,8 @@ final class ChangedFilesViewController: UIViewController {
     }
 
     private static var popupTitle: NSAttributedString {
-        let titleFont = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        let countFont = UIFont.systemFont(ofSize: 14, weight: .medium)
+        let titleFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
+        let countFont = UIFont.systemFont(ofSize: 15, weight: .medium)
         let title = NSMutableAttributedString(
             string: "2 files changed",
             attributes: [.font: titleFont, .foregroundColor: UIColor.label]
