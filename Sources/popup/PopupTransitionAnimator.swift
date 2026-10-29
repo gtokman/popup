@@ -58,6 +58,7 @@ final class PopupTransitionAnimator: NSObject, UIViewControllerAnimatedTransitio
 @MainActor
 final class PopupTransitionScene {
     private let isPresenting: Bool
+    private weak var popupController: PopupController?
 
     private var isNoOp = false
     private var isCloseMorphing = false
@@ -114,6 +115,7 @@ final class PopupTransitionScene {
         isPresenting: Bool
     ) {
         self.isPresenting = isPresenting
+        self.popupController = popupController
         let contentKey: UITransitionContextViewControllerKey = isPresenting ? .to : .from
         let presenterKey: UITransitionContextViewControllerKey = isPresenting ? .from : .to
         guard let content = context.viewController(forKey: contentKey),
@@ -129,14 +131,8 @@ final class PopupTransitionScene {
 
         var openFrame = isPresenting ? context.finalFrame(for: content) : context.initialFrame(for: content)
         if openFrame.isEmpty { openFrame = container.bounds }
-        let barFrame = container.convert(
-            PopupGeometry.restingFrame(of: bar, in: presenterView),
-            from: presenterView.superview
-        )
-        let barArtworkFrame = container.convert(
-            PopupGeometry.restingFrame(of: bar.imageView, in: presenterView),
-            from: presenterView.superview
-        )
+        let barFrame = Self.restingFrame(of: bar, in: presenterView, container: container)
+        let barArtworkFrame = Self.restingFrame(of: bar.imageView, in: presenterView, container: container)
         let openRadius = popupController.resolvedOpenCornerRadius
         let barRadius = barFrame.height / 2
         let backgroundScale = popupController.backgroundScale
@@ -159,12 +155,20 @@ final class PopupTransitionScene {
         }
 
         let artworkFrame = artworkView.map { container.convert($0.bounds, from: $0) }
-        let artworkImage = (artworkView as? UIImageView)?.image ?? bar.imageView.image
+        let artworkImage: UIImage?
+        if let artworkView, let barImage = bar.imageView.image {
+            artworkImage = (artworkView as? UIImageView)?.image ?? barImage
+        } else {
+            artworkImage = nil
+        }
         let artworkRadius = artworkView?.layer.cornerRadius ?? 0
         let barArtworkRadius = bar.imageView.layer.cornerRadius
-        let flyer: UIImageView? = (artworkImage != nil && artworkFrame != nil)
-            ? UIImageView(image: artworkImage)
-            : nil
+        let flyer: UIImageView?
+        if let artworkImage, artworkFrame != nil {
+            flyer = UIImageView(image: artworkImage)
+        } else {
+            flyer = nil
+        }
         if flyer != nil { artworkView?.alpha = 0 }
 
         bar.imageView.isHidden = flyer != nil
@@ -173,6 +177,7 @@ final class PopupTransitionScene {
         }
         bar.imageView.isHidden = false
         bar.alpha = 0
+        popupController.setBarHiddenForTransition(true)
 
         let morphView = UIView(frame: openFrame)
         morphView.clipsToBounds = true
@@ -330,7 +335,7 @@ final class PopupTransitionScene {
               let contentView,
               let containerView,
               let presenterView,
-              let bar else { return }
+              bar != nil else { return }
 
         let isOpen = reachedTarget == isPresenting
         if !isPresenting && !reachedTarget {
@@ -363,7 +368,7 @@ final class PopupTransitionScene {
                 contentView.removeFromSuperview()
                 presenterView.layer.masksToBounds = false
             }
-            bar.alpha = isOpen ? 0 : 1
+            popupController?.setBarHiddenForTransition(isOpen)
         }
         hasCompleted = true
     }
@@ -379,6 +384,15 @@ final class PopupTransitionScene {
             width: interpolate(from.width, to.width, progress),
             height: interpolate(from.height, to.height, progress)
         )
+    }
+
+    private static func restingFrame(of view: UIView, in presenter: UIView, container: UIView) -> CGRect {
+        guard view.isDescendant(of: presenter), let presenterSuperview = presenter.superview else {
+            assertionFailure("Popup bar and artwork must be descendants of the presenter view")
+            return view.convert(view.bounds, to: container)
+        }
+        let frame = PopupGeometry.restingFrame(of: view, in: presenter)
+        return container.convert(frame, from: presenterSuperview)
     }
 
     private static func clamp(_ value: CGFloat, _ lowerBound: CGFloat, _ upperBound: CGFloat) -> CGFloat {

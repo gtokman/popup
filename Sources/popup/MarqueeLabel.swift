@@ -10,6 +10,24 @@ final class MarqueeLabel: UIView {
         }
     }
 
+    var attributedText: NSAttributedString? {
+        get { label.attributedText }
+        set {
+            label.attributedText = newValue
+            trailingCopy.attributedText = newValue
+            invalidateContentSize()
+        }
+    }
+
+    var textContentWidth: CGFloat {
+        label.sizeThatFits(
+            CGSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+        ).width
+    }
+
     var font: UIFont {
         get { label.font }
         set {

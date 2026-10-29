@@ -1,9 +1,41 @@
 import UIKit
 
 public final class PopupBar: UIView {
-    public static let height: CGFloat = 56
+    public enum WidthMode: Equatable, Sendable {
+        case fill
+        case fitsContent
+    }
 
-    public var horizontalMargin: CGFloat = 12
+    public var preferredHeight: CGFloat = 56 {
+        didSet {
+            guard preferredHeight != oldValue else { return }
+            imageSizeConstraints.forEach { $0.constant = itemSide }
+            buttonSizeConstraints.forEach { $0.constant = itemSide }
+            updateTextOnlyContentInsets()
+            invalidateIntrinsicContentSize()
+            setNeedsLayout()
+            preferredHeightDidChange?(preferredHeight)
+            preferredContentWidthDidChange?(preferredContentWidth)
+        }
+    }
+
+    public var widthMode: WidthMode = .fill {
+        didSet {
+            guard widthMode != oldValue else { return }
+            updateTextOnlyContentInsets()
+            invalidateIntrinsicContentSize()
+            widthModeDidChange?(widthMode)
+        }
+    }
+
+    public var horizontalMargin: CGFloat = 12 {
+        didSet {
+            horizontalMarginDidChange?(horizontalMargin)
+        }
+    }
+    public var showsImageBackground = true {
+        didSet { updateImageBackground() }
+    }
 
     public var marqueeScrollEnabled = true {
         didSet {
@@ -16,10 +48,47 @@ public final class PopupBar: UIView {
     /// Inner radii are derived from it so every item stays concentric with the bar.
     public static let contentInset: CGFloat = 8
 
-    private static let itemSide = height - contentInset * 2
+    private var itemSide: CGFloat { max(preferredHeight - Self.contentInset * 2, 0) }
+    private var textOnlyFitHorizontalPadding: CGFloat { max(preferredHeight / 2 - 4, 0) }
+    var isInlineAccessory = false {
+        didSet {
+            updateInlineAccessoryVisibility()
+            invalidateIntrinsicContentSize()
+        }
+    }
+    var preferredHeightDidChange: ((CGFloat) -> Void)?
+    var horizontalMarginDidChange: ((CGFloat) -> Void)?
+    var widthModeDidChange: ((WidthMode) -> Void)?
+    var preferredContentWidthDidChange: ((CGFloat) -> Void)?
+
+    private var imageSizeConstraints: [NSLayoutConstraint] = []
+    private var buttonSizeConstraints: [NSLayoutConstraint] = []
+    private var isSystemAccessoryStyle = false
+
+    var preferredContentWidth: CGFloat {
+        let hasImage = popupItem?.image != nil
+        let buttonCount = popupItem?.barButtonItems.count ?? 0
+        let visibleButtonCount = isInlineAccessory ? min(buttonCount, 1) : buttonCount
+        let textWidth = max(titleLabel.textContentWidth, isInlineAccessory ? 0 : subtitleLabel.textContentWidth)
+        if widthMode == .fitsContent, !hasImage, visibleButtonCount == 0 {
+            return ceil(textWidth + textOnlyFitHorizontalPadding * 2)
+        }
+        let leadingInset = hasImage ? Self.contentInset + itemSide + 10 : 20
+        let trailingInset = visibleButtonCount > 0
+            ? Self.contentInset * 2 + 8 + CGFloat(visibleButtonCount) * itemSide
+            : 20
+        return ceil(leadingInset + textWidth + trailingInset)
+    }
 
     public var cornerRadius: CGFloat {
         bounds.height / 2
+    }
+
+    public override var intrinsicContentSize: CGSize {
+        CGSize(
+            width: widthMode == .fitsContent || isSystemAccessoryStyle ? preferredContentWidth : UIView.noIntrinsicMetric,
+            height: preferredHeight
+        )
     }
 
     public var popupItem: PopupItem? {
@@ -38,9 +107,12 @@ public final class PopupBar: UIView {
 
     private let titleLabel = MarqueeLabel()
     private let subtitleLabel = MarqueeLabel()
-    private let labelsStack = UIStackView()
+    let labelsStack = UIStackView()
     private let buttonsStack = UIStackView()
-    private let progressView = UIProgressView(progressViewStyle: .default)
+    private var labelsLeadingWithImageConstraint: NSLayoutConstraint?
+    private var labelsLeadingWithoutImageConstraint: NSLayoutConstraint?
+    private var labelsTrailingWithButtonsConstraint: NSLayoutConstraint?
+    private var labelsTrailingWithoutButtonsConstraint: NSLayoutConstraint?
 
     public override init(frame: CGRect) {
         backgroundView = UIVisualEffectView(effect: Self.backgroundEffect())
@@ -82,7 +154,7 @@ public final class PopupBar: UIView {
 
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = Self.itemSide / 2
+        imageView.layer.cornerRadius = max(cornerRadius - Self.contentInset, 0)
         imageView.layer.cornerCurve = .continuous
         imageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(imageView)
@@ -95,7 +167,7 @@ public final class PopupBar: UIView {
         subtitleLabel.font = .preferredFont(forTextStyle: .footnote)
         subtitleLabel.textColor = .secondaryLabel
         labelsStack.axis = .vertical
-        labelsStack.spacing = 1
+        labelsStack.spacing = 2
         labelsStack.addArrangedSubview(titleLabel)
         labelsStack.addArrangedSubview(subtitleLabel)
         labelsStack.translatesAutoresizingMaskIntoConstraints = false
@@ -107,20 +179,32 @@ public final class PopupBar: UIView {
         buttonsStack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(buttonsStack)
 
-        progressView.progressTintColor = UIColor.label.withAlphaComponent(0.6)
-        progressView.trackTintColor = .clear
-        progressView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(progressView)
-
         contentView.isAccessibilityElement = true
         contentView.accessibilityTraits = .button
-        contentView.accessibilityHint = "Opens the player"
+        contentView.accessibilityHint = "Opens the popup"
         isAccessibilityElement = false
 
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.12
         layer.shadowRadius = 12
         layer.shadowOffset = CGSize(width: 0, height: 4)
+
+        labelsLeadingWithImageConstraint = labelsStack.leadingAnchor.constraint(
+            equalTo: imageView.trailingAnchor,
+            constant: 10
+        )
+        labelsLeadingWithoutImageConstraint = labelsStack.leadingAnchor.constraint(
+            equalTo: contentView.leadingAnchor,
+            constant: 20
+        )
+        labelsTrailingWithButtonsConstraint = labelsStack.trailingAnchor.constraint(
+            equalTo: buttonsStack.leadingAnchor,
+            constant: -8
+        )
+        labelsTrailingWithoutButtonsConstraint = labelsStack.trailingAnchor.constraint(
+            equalTo: contentView.trailingAnchor,
+            constant: -20
+        )
 
         NSLayoutConstraint.activate([
             backgroundView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -133,26 +217,45 @@ public final class PopupBar: UIView {
             contentView.bottomAnchor.constraint(equalTo: backgroundView.contentView.bottomAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Self.contentInset),
             imageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            imageView.widthAnchor.constraint(equalToConstant: Self.itemSide),
-            imageView.heightAnchor.constraint(equalToConstant: Self.itemSide),
-            labelsStack.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 10),
             labelsStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             buttonsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -Self.contentInset),
-            buttonsStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            labelsStack.trailingAnchor.constraint(equalTo: buttonsStack.leadingAnchor, constant: -8),
-            progressView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            progressView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            progressView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -3),
-            progressView.heightAnchor.constraint(equalToConstant: 2)
+            buttonsStack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
         ])
+        imageSizeConstraints = [
+            imageView.widthAnchor.constraint(equalToConstant: itemSide),
+            imageView.heightAnchor.constraint(equalToConstant: itemSide)
+        ]
+        NSLayoutConstraint.activate(imageSizeConstraints)
+
+        update(from: nil)
     }
 
     private func update(from item: PopupItem?) {
-        titleLabel.text = item?.title
+        if let attributedTitle = item?.attributedTitle {
+            titleLabel.attributedText = attributedTitle
+        } else {
+            titleLabel.text = item?.title
+        }
         subtitleLabel.text = item?.subtitle
+        subtitleLabel.isHidden = item?.subtitle == nil
         imageView.image = item?.image
-        progressView.progress = item?.progress ?? 0
-        contentView.accessibilityLabel = [item?.title, item?.subtitle]
+        imageView.isHidden = item?.image == nil
+        if let image = item?.image, image.isSymbolImage {
+            imageView.contentMode = .center
+            imageView.preferredSymbolConfiguration = .init(pointSize: 20, weight: .semibold)
+            imageView.tintColor = .label
+        } else {
+            imageView.contentMode = .scaleAspectFill
+            imageView.preferredSymbolConfiguration = nil
+            imageView.tintColor = nil
+        }
+        updateImageBackground()
+
+        let hasImage = item?.image != nil
+        labelsLeadingWithImageConstraint?.isActive = hasImage
+        labelsLeadingWithoutImageConstraint?.isActive = !hasImage
+
+        contentView.accessibilityLabel = [item?.attributedTitle?.string ?? item?.title, item?.subtitle]
             .compactMap { $0 }
             .joined(separator: ", ")
 
@@ -160,6 +263,7 @@ public final class PopupBar: UIView {
             buttonsStack.removeArrangedSubview($0)
             $0.removeFromSuperview()
         }
+        buttonSizeConstraints.removeAll()
 
         item?.barButtonItems.forEach { barButtonItem in
             let button: UIButton
@@ -179,11 +283,59 @@ public final class PopupBar: UIView {
             button.layer.cornerCurve = .continuous
             button.layer.cornerRadius = max(cornerRadius - Self.contentInset, 0)
             button.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                button.widthAnchor.constraint(equalToConstant: Self.itemSide),
-                button.heightAnchor.constraint(equalToConstant: Self.itemSide)
-            ])
+            let sizeConstraints = [
+                button.widthAnchor.constraint(equalToConstant: itemSide),
+                button.heightAnchor.constraint(equalToConstant: itemSide)
+            ]
+            buttonSizeConstraints.append(contentsOf: sizeConstraints)
+            NSLayoutConstraint.activate(sizeConstraints)
             buttonsStack.addArrangedSubview(button)
         }
+
+        let hasButtons = item?.barButtonItems.isEmpty == false
+        labelsTrailingWithButtonsConstraint?.isActive = hasButtons
+        labelsTrailingWithoutButtonsConstraint?.isActive = !hasButtons
+        buttonsStack.isHidden = !hasButtons
+        updateTextOnlyContentInsets()
+        updateInlineAccessoryVisibility()
+        invalidateIntrinsicContentSize()
+        preferredContentWidthDidChange?(preferredContentWidth)
+    }
+
+    func setSystemAccessoryStyle(_ enabled: Bool) {
+        isSystemAccessoryStyle = enabled
+        invalidateIntrinsicContentSize()
+        backgroundView.isHidden = false
+        backgroundView.effect = enabled ? nil : Self.backgroundEffect()
+        layer.shadowOpacity = enabled ? 0 : 0.12
+    }
+
+    private func updateImageBackground() {
+        guard showsImageBackground, let image = popupItem?.image, image.isSymbolImage else {
+            imageView.backgroundColor = .clear
+            return
+        }
+        imageView.backgroundColor = UIColor.label.withAlphaComponent(0.08)
+    }
+
+    private func updateInlineAccessoryVisibility() {
+        updateTextOnlyContentInsets()
+        subtitleLabel.isHidden = isInlineAccessory || popupItem?.subtitle == nil
+        for (index, button) in buttonsStack.arrangedSubviews.enumerated() {
+            button.isHidden = isInlineAccessory && index > 0
+        }
+        invalidateIntrinsicContentSize()
+        preferredContentWidthDidChange?(preferredContentWidth)
+    }
+
+    private func updateTextOnlyContentInsets() {
+        let buttonCount = popupItem?.barButtonItems.count ?? 0
+        let visibleButtonCount = isInlineAccessory ? min(buttonCount, 1) : buttonCount
+        let usesCompactInsets = widthMode == .fitsContent
+            && popupItem?.image == nil
+            && visibleButtonCount == 0
+        let inset = usesCompactInsets ? textOnlyFitHorizontalPadding : 20
+        labelsLeadingWithoutImageConstraint?.constant = inset
+        labelsTrailingWithoutButtonsConstraint?.constant = -inset
     }
 }

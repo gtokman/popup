@@ -2,6 +2,8 @@ import popup
 import UIKit
 
 final class NowPlayingViewController: UIViewController, PopupContentTransitioning {
+    private unowned let player: PlayerModel
+
     var popupArtworkView: UIView? {
         artworkView
     }
@@ -35,6 +37,15 @@ final class NowPlayingViewController: UIViewController, PopupContentTransitionin
         .lightContent
     }
 
+    init(player: PlayerModel) {
+        self.player = player
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         modalPresentationCapturesStatusBarAppearance = true
@@ -48,18 +59,15 @@ final class NowPlayingViewController: UIViewController, PopupContentTransitionin
     }
 
     func playerDidUpdate() {
-        let player = PlayerModel.shared
         let song = player.currentSong
         if let song {
             popupItem.title = song.title
             popupItem.subtitle = song.artist
             popupItem.image = Artwork.image(for: song.artworkIndex, size: CGSize(width: 120, height: 120))
-            popupItem.progress = song.duration == 0 ? 0 : Float(player.elapsedTime / song.duration)
         } else {
             popupItem.title = "Nothing Playing"
             popupItem.subtitle = nil
             popupItem.image = nil
-            popupItem.progress = 0
         }
         playPauseItem.image = UIImage(systemName: player.isPlaying ? "pause.fill" : "play.fill")
         popupItem.barButtonItems = [playPauseItem, forwardItem]
@@ -87,24 +95,24 @@ final class NowPlayingViewController: UIViewController, PopupContentTransitionin
         }
         playPauseButton.setImage(UIImage(systemName: player.isPlaying ? "pause.fill" : "play.fill"), for: .normal)
         UIView.animate(withDuration: 0.35, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-            self.artworkWrapper.transform = player.isPlaying ? .identity : CGAffineTransform(scaleX: 0.85, y: 0.85)
+            self.artworkWrapper.transform = self.player.isPlaying ? .identity : CGAffineTransform(scaleX: 0.85, y: 0.85)
         }
     }
 
     @objc private func togglePlayback() {
-        PlayerModel.shared.togglePlayback()
+        player.togglePlayback()
     }
 
     @objc private func skipForward() {
-        PlayerModel.shared.skipForward()
+        player.skipForward()
     }
 
     @objc private func skipBackward() {
-        PlayerModel.shared.skipBackward()
+        player.skipBackward()
     }
 
     @objc private func seek(_ sender: UISlider) {
-        PlayerModel.shared.seek(to: sender.value)
+        player.seek(to: sender.value)
     }
 
     private func configureViews() {
@@ -325,7 +333,7 @@ final class NowPlayingViewController: UIViewController, PopupContentTransitionin
         section.addArrangedSubview(heading)
         section.setCustomSpacing(8, after: heading)
 
-        let currentIndex = PlayerModel.shared.currentSong.flatMap { Song.library.firstIndex(of: $0) } ?? -1
+        let currentIndex = player.currentSong.flatMap { Song.library.firstIndex(of: $0) } ?? -1
         for offset in 1...12 {
             let song = Song.library[(currentIndex + offset) % Song.library.count]
             section.addArrangedSubview(makeQueueRow(song))

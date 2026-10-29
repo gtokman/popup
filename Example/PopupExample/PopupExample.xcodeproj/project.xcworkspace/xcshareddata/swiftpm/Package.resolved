@@ -1,0 +1,33 @@
+{
+  "originHash" : "1bee3ace15a373fd55adb8c869f41261ae8da97edbda0eddaa2fc3a97e744406",
+  "pins" : [
+    {
+      "identity" : "snapkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/SnapKit/SnapKit",
+      "state" : {
+        "revision" : "2842e6e84e82eb9a8dac0100ca90d9444b0307f4",
+        "version" : "5.7.1"
+      }
+    },
+    {
+      "identity" : "then",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/devxoul/Then",
+      "state" : {
+        "revision" : "d41ef523faef0f911369f79c0b96815d9dbb6d7a",
+        "version" : "3.0.0"
+      }
+    },
+    {
+      "identity" : "uitextview-placeholder",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/devxoul/UITextView-Placeholder.git",
+      "state" : {
+        "revision" : "1844585d189f4c753b9bfc1e6a617baa34c66439",
+        "version" : "1.5.0"
+      }
+    }
+  ],
+  "version" : 3
+}
