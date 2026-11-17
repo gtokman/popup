@@ -103,6 +103,34 @@ func popupBarAccessoryStyleKeepsContentVisible() {
 }
 
 @Test @MainActor
+func popupBarAccessoryItemsFollowSystemHeight() {
+    let item = PopupItem()
+    item.image = UIImage(systemName: "music.note")
+    let bar = PopupBar(frame: CGRect(x: 0, y: 0, width: 360, height: 48))
+    bar.popupItem = item
+    bar.setSystemAccessoryStyle(true)
+    bar.setNeedsLayout()
+    bar.layoutIfNeeded()
+    bar.layoutIfNeeded()
+
+    #expect(bar.imageView.bounds.height == 32)
+    #expect(bar.imageView.layer.cornerRadius == 16)
+}
+
+@Test @MainActor
+func tabBarAccessoryBarFillsSystemContainer() {
+    let tabBarController = UITabBarController()
+    tabBarController.viewControllers = [UIViewController()]
+    tabBarController.popupController.usesTabBarAccessory = true
+    tabBarController.loadViewIfNeeded()
+    tabBarController.presentPopupBar(with: UIViewController(), animated: false)
+
+    let bar = tabBarController.popupBar
+    #expect(bar.translatesAutoresizingMaskIntoConstraints)
+    #expect(bar.autoresizingMask == [.flexibleWidth, .flexibleHeight])
+}
+
+@Test @MainActor
 func popupBarInlineAccessoryFitsVisibleControls() {
     let bar = PopupBar()
     let item = PopupItem()
