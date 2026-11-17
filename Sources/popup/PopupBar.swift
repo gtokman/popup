@@ -48,7 +48,11 @@ public final class PopupBar: UIView {
     /// Inner radii are derived from it so every item stays concentric with the bar.
     public static let contentInset: CGFloat = 8
 
-    private var itemSide: CGFloat { max(preferredHeight - Self.contentInset * 2, 0) }
+    /// As a tab accessory the system picks the bar's height, so items follow the real height.
+    private var itemSide: CGFloat {
+        let height = isSystemAccessoryStyle && bounds.height > 0 ? bounds.height : preferredHeight
+        return max(height - Self.contentInset * 2, 0)
+    }
     private var textOnlyFitHorizontalPadding: CGFloat { max(preferredHeight / 2 - 4, 0) }
     var isInlineAccessory = false {
         didSet {
@@ -128,6 +132,9 @@ public final class PopupBar: UIView {
 
     public override func layoutSubviews() {
         super.layoutSubviews()
+        for constraint in imageSizeConstraints + buttonSizeConstraints where constraint.constant != itemSide {
+            constraint.constant = itemSide
+        }
         backgroundView.layer.cornerRadius = cornerRadius
         let concentricRadius = max(cornerRadius - Self.contentInset, 0)
         imageView.layer.cornerRadius = concentricRadius

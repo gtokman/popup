@@ -191,7 +191,6 @@ public final class PopupController: NSObject {
     }
 
     private func installBar(in container: UIViewController) {
-        bar.translatesAutoresizingMaskIntoConstraints = false
         let view = container.view!
         view.layoutIfNeeded()
         if #available(iOS 26.0, *),
@@ -199,12 +198,16 @@ public final class PopupController: NSObject {
            usesTabBarAccessory {
             isUsingTabBarAccessory = true
             bar.setSystemAccessoryStyle(true)
+            // The system sizes the accessory container; the bar fills it instead of using its own size.
+            bar.translatesAutoresizingMaskIntoConstraints = true
+            bar.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             tabBarController.setBottomAccessory(UITabAccessory(contentView: bar), animated: true)
             bar.isInlineAccessory = tabBarController.traitCollection.tabAccessoryEnvironment == .inline
             return
         }
         isUsingTabBarAccessory = false
         bar.setSystemAccessoryStyle(false)
+        bar.translatesAutoresizingMaskIntoConstraints = false
         let bottom: NSLayoutConstraint
         if let anchor = dockingAnchorView, let parent = anchor.superview {
             parent.insertSubview(bar, belowSubview: anchor)
