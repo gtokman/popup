@@ -1,6 +1,6 @@
 # popup
 
-A native UIKit popup bar and full-screen presentation for iOS, as an alternative to LNPopupController.
+A native UIKit popup bar and full-screen presentation for iOS.
 
 ## Features
 
