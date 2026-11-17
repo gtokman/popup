@@ -182,9 +182,15 @@ final class PopupTransitionScene {
         let morphView = UIView(frame: openFrame)
         morphView.clipsToBounds = true
         morphView.layer.cornerCurve = .continuous
-        let backdrop = UIVisualEffectView(effect: bar.backgroundView.effect)
+        let backdrop = UIVisualEffectView(effect: bar.transitionBackdropEffect)
         backdrop.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         let barSnapshot = UIImageView(image: barRender)
+        if #available(iOS 26, *) {
+            // Glass draws its content white and recolors it when compositing, so the render is recolored here.
+            barSnapshot.image = barRender.withRenderingMode(.alwaysTemplate)
+            barSnapshot.tintColor = .label
+            barSnapshot.overrideUserInterfaceStyle = bar.traitCollection.userInterfaceStyle
+        }
         barSnapshot.bounds = CGRect(origin: .zero, size: barFrame.size)
         contentView.autoresizingMask = []
         contentView.frame = CGRect(origin: .zero, size: openFrame.size)

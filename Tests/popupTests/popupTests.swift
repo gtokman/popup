@@ -318,3 +318,12 @@ func softenedOvershootIsIdentityMonotonicAndBounded() {
     #expect(outputs.first! >= -0.03)
     #expect(outputs.last! <= 1.03)
 }
+
+@Test @MainActor
+func accessoryBarStillProvidesATransitionBackdrop() {
+    let bar = PopupBar(frame: CGRect(x: 0, y: 0, width: 360, height: 48))
+    bar.setSystemAccessoryStyle(true)
+
+    #expect(bar.backgroundView.effect == nil)
+    #expect(type(of: bar.transitionBackdropEffect) == type(of: PopupBar().backgroundView.effect!))
+}

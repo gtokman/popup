@@ -135,6 +135,9 @@ public final class PopupBar: UIView {
         layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: cornerRadius).cgPath
     }
 
+    /// The system draws a tab accessory's glass, so the transition supplies its own while that is hidden.
+    var transitionBackdropEffect: UIVisualEffect { backgroundView.effect ?? Self.backgroundEffect() }
+
     private static func backgroundEffect() -> UIVisualEffect {
         if #available(iOS 26, *) {
             return UIGlassEffect()
