@@ -212,6 +212,13 @@ public final class PopupController: NSObject {
         if let anchor = dockingAnchorView, let parent = anchor.superview {
             parent.insertSubview(bar, belowSubview: anchor)
             bottom = bar.bottomAnchor.constraint(equalTo: anchor.topAnchor, constant: -barSpacing)
+        } else if let tabBar = (container as? UITabBarController)?.tabBar,
+                  !tabBar.isHidden,
+                  tabBar.isDescendant(of: view),
+                  tabBar.convert(tabBar.bounds, to: view).midY > view.bounds.midY {
+            // iOS 26 nests the tab bar in private containers, so the bar goes in the root view.
+            view.addSubview(bar)
+            bottom = bar.bottomAnchor.constraint(equalTo: tabBar.topAnchor, constant: -barSpacing)
         } else if let navigationController = container as? UINavigationController, !navigationController.isToolbarHidden {
             let toolbar = navigationController.toolbar
             view.addSubview(bar)

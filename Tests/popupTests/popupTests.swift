@@ -182,6 +182,24 @@ func popupBarCanDockAboveNavigationToolbar() {
 }
 
 @Test @MainActor
+func popupBarDocksAboveTabBarWithoutOverlapping() {
+    let tabBarController = UITabBarController()
+    tabBarController.viewControllers = [UIViewController()]
+    tabBarController.popupController.usesTabBarAccessory = false
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+    window.rootViewController = tabBarController
+    window.isHidden = false
+    tabBarController.presentPopupBar(with: UIViewController(), animated: false)
+    tabBarController.view.layoutIfNeeded()
+
+    let bar = tabBarController.popupBar
+    let barFrame = bar.convert(bar.bounds, to: tabBarController.view)
+    let tabBarFrame = tabBarController.tabBar.convert(tabBarController.tabBar.bounds, to: tabBarController.view)
+
+    #expect(barFrame.maxY == tabBarFrame.minY - tabBarController.popupController.barSpacing)
+}
+
+@Test @MainActor
 func viewControllerPopupItemIsStable() {
     let viewController = UIViewController()
 
